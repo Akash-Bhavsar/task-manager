@@ -62,7 +62,6 @@ describe('User Endpoints', () => {
     expect(res.statusCode).toEqual(200);
 
     // Check for Set-Cookie header
-    debugger;
     const setCookieHeader = res.headers['set-cookie'];
     expect(setCookieHeader).toBeDefined();
     expect(Array.isArray(setCookieHeader)).toBe(true);

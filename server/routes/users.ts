@@ -87,6 +87,41 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
     res.status(500).json({ error: 'Failed to update user' });
   }
 });
+// GET endpoint: Get a specific user's information
+router.get('/me', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    logger.info(`GET /users/me called by userId=${req.userId}`);
+
+    // If no userId is present in the request after authentication, return false
+    if (!req.userId) {
+      logger.warn('No authenticated user found');
+      res.json(false);
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        // Exclude password and other sensitive fields
+      },
+    });
+
+    if (!user) {
+      logger.warn(`User with id=${req.userId} not found even though token was valid`);
+      res.json(false);
+      return;
+    }
+
+    logger.info(`Current user information fetched successfully for id=${req.userId}`);
+    res.json(user);
+  } catch (err) {
+    logger.error(`Failed to get current user info: ${(err as Error).message}`, { error: err });
+    res.status(500).json({ error: 'Failed to get user information' });
+  }
+});
 
 // LOGIN endpoint: Authenticate user and return a JWT token
 router.post('/login', async (req: Request, res: Response): Promise<void> => {

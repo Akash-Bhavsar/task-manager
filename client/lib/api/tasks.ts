@@ -24,15 +24,3 @@ export async function fetchMyTasks() {
 
   return response.json();
 }
-
-export async function logoutUser() {
-  // Adjust this to your logout endpoint if you have one
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to log out: ${response.status}`);
-  }
-}
