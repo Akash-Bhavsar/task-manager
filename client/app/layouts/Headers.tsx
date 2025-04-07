@@ -52,7 +52,7 @@ const Header: React.FC = () => {
                                 <Link href="/" className="rounded-md px-3 py-2 text-sm font-medium text-green-500 hover:bg-green-100">
                                     Home
                                 </Link>
-                                {!isLoggedIn && (
+                                {isLoggedIn && (
                                     <Link href="/dashboard" className="rounded-md px-3 py-2 text-sm font-medium text-green-500 hover:bg-green-100">
                                         Dashboard
                                     </Link>

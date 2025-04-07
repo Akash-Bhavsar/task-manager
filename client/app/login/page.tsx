@@ -18,7 +18,7 @@ export default function LoginPage() {
     const router = useRouter();
 
     const handleCloseToast = () => {
-        setToast({ message: "", type: "" });
+        setToast({ message: "", type: null });
     };
 
     const handleLogin = async (e: React.FormEvent) => {

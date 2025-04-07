@@ -53,7 +53,6 @@ export function logoutUser() {
 }
 
 export async function signupUser(username: string, password: string) {
-    debugger;
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -24,3 +24,56 @@ export async function fetchMyTasks() {
 
   return response.json();
 }
+
+export interface TaskData {
+  title: string;
+  description: string;
+  status: string;
+}
+
+export async function createTask(taskData: TaskData) {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(taskData),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create task: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function updateTask(taskId: string, updatedData: any) {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updatedData),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update task ${taskId}: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteTask(taskId: string) {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete task ${taskId}: ${response.status}`);
+  }
+
+  return response.json();
+}

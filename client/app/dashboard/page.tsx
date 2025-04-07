@@ -2,19 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchTasks } from "@/lib/api/tasks";
+import {
+  fetchTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+} from "@/lib/api/tasks";
 import { FaEdit, FaTrash, FaTasks, FaPlus } from "react-icons/fa";
-// import { deleteTask } from "@/lib/api/tasks"; // Uncomment if you have a delete API
+import Task, { TaskData } from "@/app/components/Task";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<TaskData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Dropdown & filter/search UI state
   const [showDropdown, setShowDropdown] = useState(false);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentTask, setCurrentTask] = useState<TaskData | undefined>(
+    undefined
+  );
+
+  // Fetch tasks on mount
   useEffect(() => {
     const getTasks = async () => {
       try {
@@ -22,10 +36,8 @@ export default function DashboardPage() {
         setTasks(data);
       } catch (err) {
         if (err instanceof Error) {
-          if (
-            err.message.includes("401") ||
-            err.message.includes("403")
-          ) {
+          // If 401/403, probably not authenticated => redirect to login
+          if (err.message.includes("401") || err.message.includes("403")) {
             router.push("/login");
             return;
           }
@@ -39,26 +51,93 @@ export default function DashboardPage() {
     };
 
     getTasks();
+    // If you want to poll or refresh periodically, you can do so here
+    // const interval = setInterval(getTasks, 5000);
+    // return () => clearInterval(interval);
   }, [router]);
 
-  const handleDeleteTask = async (taskId: string) => {
+  // 1) Create a new task: open modal with no initialTask
+  const handleCreateTask = () => {
+    setCurrentTask(undefined);
+    setModalOpen(true);
+  };
+
+  // 2) Edit an existing task: open modal with that task
+  const handleEditTask = (task: TaskData) => {
+    setCurrentTask(task);
+    setModalOpen(true);
+  };
+
+  // 3) Actually create or update the task from the Task modal
+  const handleModalSubmit = async (newOrUpdatedTask: TaskData) => {
     try {
-      // Uncomment and adapt the line below if a deleteTask API is available:
-      // await deleteTask(taskId);
-      setTasks(tasks.filter(task => task.id !== taskId));
+      if (newOrUpdatedTask.id) {
+        // This is an "update" flow
+        const updatedFromServer = await updateTask(
+          String(newOrUpdatedTask.id),
+          {
+            title: newOrUpdatedTask.title,
+            description: newOrUpdatedTask.description,
+            status: newOrUpdatedTask.status,
+          }
+        );
+
+        // Update local tasks array
+        setTasks((prev) =>
+          prev.map((t) => (t.id === updatedFromServer.id ? updatedFromServer : t))
+        );
+      } else {
+        // Create flow
+        const createdFromServer = await createTask({
+          title: newOrUpdatedTask.title,
+          description: newOrUpdatedTask.description,
+          status: newOrUpdatedTask.status,
+        });
+
+        // Append newly created task to local array
+        setTasks((prev) => [...prev, createdFromServer]);
+      }
+      setModalOpen(false);
     } catch (err) {
-      console.error("Failed to delete task:", err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Unknown error occurred while saving task.");
+      }
     }
   };
 
-  const handleEditTask = (taskId: string) => {
-    router.push(`/tasks/${taskId}/edit`);
+  // 4) Delete a task from the Task modal or inline
+  const handleModalDelete = async (taskId: number) => {
+    try {
+      await deleteTask(String(taskId));
+      // Remove it from local array
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setModalOpen(false);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Unknown error occurred while deleting task.");
+      }
+    }
   };
 
-  const handleCreateTask = () => {
-    router.push("/tasks/create");
+  // 5) Direct inline delete button (not using modal)
+  const handleInlineDelete = async (taskId: number) => {
+    try {
+      await deleteTask(String(taskId));
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Unknown error occurred while deleting task.");
+      }
+    }
   };
 
+  // Loading screen
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-lightGreen p-4">
@@ -69,6 +148,7 @@ export default function DashboardPage() {
     );
   }
 
+  // Error screen
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-redish p-4">
@@ -77,7 +157,7 @@ export default function DashboardPage() {
         </h2>
         <button
           onClick={() => router.push("/login")}
-          className="mt-4 bg-yellowish hover:bg-yellow-500 text-background py-2 px-4 rounded focus:outline-none transition"
+          className="mt-4 bg-yellowish hover:bg-yellow-400 text-background py-2 px-4 rounded focus:outline-none transition"
         >
           Re-Login
         </button>
@@ -85,17 +165,26 @@ export default function DashboardPage() {
     );
   }
 
+  // Filter + search
+  const filteredTasks = tasks.filter((task) => {
+    if (filter !== "all" && task.status !== filter) return false;
+    if (
+      searchTerm &&
+      !task.title.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+      return false;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-green-50 p-6">
       <div className="max-w-3xl bg-green-25 mx-auto rounded-md shadow-md p-6">
-        {/* Header */}
+        {/* Top Header */}
         <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <FaTasks className="text-foreground" />
-              <h1 className="text-2xl font-bold text-foreground">
-              Dashboard
-              </h1>
+              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
             </div>
             <button
               onClick={handleCreateTask}
@@ -104,17 +193,18 @@ export default function DashboardPage() {
               <FaPlus />
               Create Task
             </button>
-            </div>
+          </div>
 
+          {/* Filter & search */}
           <div className="mb-6">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
-                  className="shrink-0 z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-center text-foreground bg-green-100 border border-yellowish rounded-lg hover:bg-green-200 focus:outline-none"
+                  className="shrink-0 z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-foreground bg-green-100 border border-yellowish rounded-lg hover:bg-green-200 focus:outline-none"
                   type="button"
                 >
-                  Filter by: {filter.charAt(0).toUpperCase() + filter.slice(1)}{" "}
+                  Filter by: {filter.charAt(0).toUpperCase() + filter.slice(1)}
                   <svg
                     className="w-2.5 h-2.5 ms-2.5"
                     aria-hidden="true"
@@ -174,6 +264,8 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
+
+              {/* Search bar */}
               <div className="relative flex-grow">
                 <input
                   type="search"
@@ -188,47 +280,51 @@ export default function DashboardPage() {
         </div>
 
         {/* Task List */}
-        <h2 className="text-xl font-semibold text-foreground mb-4">
-          My Tasks
-        </h2>
-        {tasks.length === 0 ? (
+        <h2 className="text-xl font-semibold text-foreground mb-4">My Tasks</h2>
+        {filteredTasks.length === 0 ? (
           <div className="text-foreground">No tasks available.</div>
         ) : (
           <ul className="space-y-3">
-            {tasks.map((task) => (
+            {filteredTasks.map((task) => (
               <li
                 key={task.id}
                 className="p-4 border border-yellowish rounded-lg shadow-sm"
               >
-                <div className="font-bold text-lg text-foreground">
-                  {task.title}
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-lg text-foreground">
+                    {task.title}
+                  </div>
+                  <span
+                    className={
+                      task.status === "completed"
+                        ? "text-greenish font-semibold ml-2"
+                        : "text-orange-500 font-semibold ml-2"
+                    }
+                  >
+                    {task.status.toUpperCase()}
+                  </span>
                 </div>
-                <p className="text-foreground">
-                  {task.description}
+                <p className="text-foreground overflow-hidden">
+                  {task.description.length > 80
+                    ? task.description.slice(0, 80) + "..."
+                    : task.description}
                 </p>
-                <span
-                  className={
-                    task.status === "completed"
-                      ? "text-greenish font-semibold"
-                      : "text-orange-500 font-semibold"
-                  }
-                >
-                  {task.status.toUpperCase()}
-                </span>
+
+                {/* Edit & Delete buttons */}
                 <div className="mt-4 flex gap-2">
                   <button
-                  onClick={() => handleEditTask(task.id)}
-                  className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-green-400 flex items-center"
+                    onClick={() => handleEditTask(task)}
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
                   >
-                  <FaEdit className="mr-2" />
-                  Edit
+                    <FaEdit className="mr-2" />
+                    Edit
                   </button>
                   <button
-                  onClick={() => handleDeleteTask(task.id)}
-                  className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-green-400 flex items-center"
+                    onClick={() => handleInlineDelete(task.id!)}
+                    className="bg-redish hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
                   >
-                  <FaTrash className="mr-2" />
-                  Delete
+                    <FaTrash className="mr-2" />
+                    Delete
                   </button>
                 </div>
               </li>
@@ -236,6 +332,15 @@ export default function DashboardPage() {
           </ul>
         )}
       </div>
+
+      {/* Our Task Modal */}
+      <Task
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        initialTask={currentTask}
+        onSubmit={handleModalSubmit}
+        onDelete={handleModalDelete}
+      />
     </div>
   );
 }
