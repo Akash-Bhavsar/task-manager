@@ -86,7 +86,7 @@ const Task: React.FC<TaskProps> = ({
     e.preventDefault();
     try {
       await onSubmit(task);
-      setToast({ message: "Task saved successfully", type: "success" });
+    //   setToast({ message: "Task saved successfully", type: "success" });
       onClose();
     } catch (err) {
       console.error(err);

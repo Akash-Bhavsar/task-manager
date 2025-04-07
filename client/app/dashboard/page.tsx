@@ -8,7 +8,7 @@ import {
   updateTask,
   deleteTask,
 } from "@/lib/api/tasks";
-import { FaEdit, FaTrash, FaTasks, FaPlus } from "react-icons/fa";
+import { FaEdit, FaTrash, FaTasks, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import Task, { TaskData } from "@/app/components/Task";
 
 export default function DashboardPage() {
@@ -21,6 +21,10 @@ export default function DashboardPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
 
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
@@ -51,28 +55,44 @@ export default function DashboardPage() {
     };
 
     getTasks();
-    // If you want to poll or refresh periodically, you can do so here
-    // const interval = setInterval(getTasks, 5000);
-    // return () => clearInterval(interval);
   }, [router]);
 
-  // 1) Create a new task: open modal with no initialTask
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, searchTerm]);
+
+  // Handle pagination
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const goToPage = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
+
+  // Rest of your handlers...
   const handleCreateTask = () => {
     setCurrentTask(undefined);
     setModalOpen(true);
   };
 
-  // 2) Edit an existing task: open modal with that task
   const handleEditTask = (task: TaskData) => {
     setCurrentTask(task);
     setModalOpen(true);
   };
 
-  // 3) Actually create or update the task from the Task modal
   const handleModalSubmit = async (newOrUpdatedTask: TaskData) => {
     try {
       if (newOrUpdatedTask.id) {
-        // This is an "update" flow
         const updatedFromServer = await updateTask(
           String(newOrUpdatedTask.id),
           {
@@ -82,19 +102,16 @@ export default function DashboardPage() {
           }
         );
 
-        // Update local tasks array
         setTasks((prev) =>
           prev.map((t) => (t.id === updatedFromServer.id ? updatedFromServer : t))
         );
       } else {
-        // Create flow
         const createdFromServer = await createTask({
           title: newOrUpdatedTask.title,
           description: newOrUpdatedTask.description,
           status: newOrUpdatedTask.status,
         });
 
-        // Append newly created task to local array
         setTasks((prev) => [...prev, createdFromServer]);
       }
       setModalOpen(false);
@@ -107,11 +124,9 @@ export default function DashboardPage() {
     }
   };
 
-  // 4) Delete a task from the Task modal or inline
   const handleModalDelete = async (taskId: number) => {
     try {
       await deleteTask(String(taskId));
-      // Remove it from local array
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
       setModalOpen(false);
     } catch (err) {
@@ -123,7 +138,6 @@ export default function DashboardPage() {
     }
   };
 
-  // 5) Direct inline delete button (not using modal)
   const handleInlineDelete = async (taskId: number) => {
     try {
       await deleteTask(String(taskId));
@@ -137,7 +151,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Loading screen
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-lightGreen p-4">
@@ -148,7 +161,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Error screen
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-redish p-4">
@@ -175,6 +187,12 @@ export default function DashboardPage() {
       return false;
     return true;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
+  const indexOfLastTask = currentPage * itemsPerPage;
+  const indexOfFirstTask = indexOfLastTask - itemsPerPage;
+  const currentTasks = filteredTasks.slice(indexOfFirstTask, indexOfLastTask);
 
   return (
     <div className="min-h-screen bg-green-50 p-6">
@@ -284,52 +302,101 @@ export default function DashboardPage() {
         {filteredTasks.length === 0 ? (
           <div className="text-foreground">No tasks available.</div>
         ) : (
-          <ul className="space-y-3">
-            {filteredTasks.map((task) => (
-              <li
-                key={task.id}
-                className="p-4 border border-yellowish rounded-lg shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="font-bold text-lg text-foreground">
-                    {task.title}
+          <>
+            <ul className="space-y-3">
+              {currentTasks.map((task) => (
+                <li
+                  key={task.id}
+                  className="p-4 border border-yellowish rounded-lg shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-lg text-foreground">
+                      {task.title}
+                    </div>
+                    <span
+                      className={
+                        task.status === "completed"
+                          ? "text-greenish font-semibold ml-2"
+                          : "text-orange-500 font-semibold ml-2"
+                      }
+                    >
+                      {task.status.toUpperCase()}
+                    </span>
                   </div>
-                  <span
-                    className={
-                      task.status === "completed"
-                        ? "text-greenish font-semibold ml-2"
-                        : "text-orange-500 font-semibold ml-2"
-                    }
-                  >
-                    {task.status.toUpperCase()}
-                  </span>
-                </div>
-                <p className="text-foreground overflow-hidden">
-                  {task.description.length > 80
-                    ? task.description.slice(0, 80) + "..."
-                    : task.description}
-                </p>
+                  <p className="text-foreground overflow-hidden">
+                    {task.description.length > 80
+                      ? task.description.slice(0, 80) + "..."
+                      : task.description}
+                  </p>
 
-                {/* Edit & Delete buttons */}
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => handleEditTask(task)}
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
-                  >
-                    <FaEdit className="mr-2" />
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleInlineDelete(task.id!)}
-                    className="bg-redish hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
-                  >
-                    <FaTrash className="mr-2" />
-                    Delete
-                  </button>
+                  {/* Edit & Delete buttons */}
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => handleEditTask(task)}
+                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
+                    >
+                      <FaEdit className="mr-2" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleInlineDelete(task.id!)}
+                      className="bg-redish hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
+                    >
+                      <FaTrash className="mr-2" />
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center mt-6 space-x-2">
+                <button
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1 rounded-md flex items-center ${
+                    currentPage === 1
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      : "bg-green-100 text-foreground hover:bg-green-200"
+                  }`}
+                >
+                  <FaChevronLeft className="mr-1" />
+                  Prev
+                </button>
+
+                <div className="flex space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-1 rounded-md ${
+                        currentPage === page
+                          ? "bg-green-500 text-white"
+                          : "bg-green-100 text-foreground hover:bg-green-200"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
                 </div>
-              </li>
-            ))}
-          </ul>
+
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1 rounded-md flex items-center ${
+                    currentPage === totalPages
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      : "bg-green-100 text-foreground hover:bg-green-200"
+                  }`}
+                >
+                  Next
+                  <FaChevronRight className="ml-1" />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
