@@ -13,7 +13,7 @@ A simple and efficient task management application to help you organize your wor
 
 ### Frontend (Client):
 
--  **Framework**: Next.js (React-based framework)
+-  **Framework**: Next.js (React-based framework), Typescript
 
 -  **Styling**: Tailwind CSS for utility-first styling
 
@@ -25,7 +25,7 @@ A simple and efficient task management application to help you organize your wor
 
 ### Backend (Server):
 
--  **Framework**: Node.js with Express.js
+-  **Framework**: Node.js with Express.js, Typescript
 
 -  **Database**: PostgreSQL with Prisma ORM for type-safe queries
 
