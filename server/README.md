@@ -48,7 +48,7 @@ cd node-api
 
 3. Install dependencies:
 
-  
+
 
 ```bash
 
@@ -58,7 +58,7 @@ npm install
 
 4. Configure Environment Variables:
 
-  
+
 Create a `.env` file in the root directory with the following content (adjust values as needed):
 
 ```
@@ -73,28 +73,45 @@ PORT=3000
 
 5. Set Up the Database:
 
-Run Prisma migrations to create the database tables:
+**Option A: Using the initialization script (Recommended)**
 
-  
+Run the provided initialization script that handles database creation and schema setup automatically:
 
 ```bash
-
-npx prisma migrate dev --name init
-
+chmod +x scripts/init-db.sh
+./scripts/init-db.sh
 ```
 
+The script will:
+- Check PostgreSQL connectivity
+- Create the database if it doesn't exist
+- Install npm dependencies if needed
+- Generate the Prisma client
+- Sync the database schema with Prisma
+
+You can also specify a custom database name:
+
+```bash
+./scripts/init-db.sh my_custom_db
+```
+
+**Option B: Manual setup**
+
+Run Prisma migrations to create the database tables:
+
+```bash
+npx prisma migrate dev --name init
+```
 
 Or, for quick development without migration history:
 
 ```bash
-
 npx prisma db push
-
 ```
 
 6. Start the Server:
 
-  
+
 
 ```bash
 

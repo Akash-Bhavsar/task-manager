@@ -13,15 +13,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^6.5.0",
+    "@prisma/client": "^6.6.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "express-basic-auth": "^1.2.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "pg": "^8.14.1",
+    "pg": "^8.15.6",
     "winston": "^3.17.0"
   },
   "devDependencies": {
@@ -31,15 +31,15 @@
     "@types/express": "^5.0.1",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/morgan": "^1.9.9",
-    "@types/node": "^22.13.11",
+    "@types/node": "^22.15.3",
     "@types/supertest": "^6.0.3",
     "@types/winston": "^2.4.4",
     "cookie-parser": "^1.4.7",
-    "prisma": "^6.5.0",
+    "prisma": "^6.6.0",
     "supertest": "^7.1.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.9"
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
   }
 }
