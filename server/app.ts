@@ -11,8 +11,12 @@ dotenv.config();
 
 const app = express();
 
+// Allowed browser origin for CORS. Set CLIENT_ORIGIN in production to the
+// deployed client URL (e.g. https://<project>.vercel.app).
+const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
+
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: clientOrigin,
   credentials: true
 }));
 const port = process.env.PORT || 3000;

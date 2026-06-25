@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored (*.tfvars).
+
+# --- Neon ---
+neon_api_key = "neon_xxx"
+
+# --- GitHub (git-native auto-deploy) ---
+github_repo = "Akash-Bhavsar/task-manager"
+
+# --- Vercel (client) ---
+vercel_api_token = "xxxxxxxx"
+# vercel_team_id = "team_xxx"        # only if the project is under a team
+vercel_project_name = "task-manager-client"
+
+# --- Render (server) ---
+render_api_key      = "rnd_xxxxxxxx"
+render_owner_id     = "tea-xxxxxxxx"   # or usr-xxxxxxxx; see `render owners` / API
+render_service_name = "task-manager-api"
+render_region       = "singapore"
+render_plan         = "starter"
+
+# --- App secrets ---
+jwt_secret = "use-a-long-random-string"

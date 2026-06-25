@@ -85,9 +85,17 @@ CI uses).
   - `server` — spins up a `postgres:16` service, then `npm ci`,
     `prisma generate`, `prisma db push`, `npm run build`, `npm test`
   - Least-privilege (`contents: read`), npm caching, concurrency cancel.
-- **CD (deferred):** intended to be platform-native — Vercel (client) + Render
-  (server) auto-deploy on push once the repo is connected; Neon hosts Postgres.
-  Not wired up yet. GitHub Actions deliberately does CI only.
+- **CD:** platform-native, declared in `terraform/`. Pushing to `main` makes
+  **Vercel** (client) and **Render** (server) rebuild and deploy automatically;
+  **Neon** hosts Postgres. GitHub Actions does CI only — it does not deploy.
+  - `terraform/deploy.tf` defines the Vercel project + Render web service with
+    `auto_deploy` and the GitHub link; env vars (incl. `NEXT_PUBLIC_API_URL`,
+    `DATABASE_URL`, `JWT_SECRET`, `CLIENT_ORIGIN`) are wired there.
+  - Setup + apply steps: `terraform/README.md`. Requires a one-time GitHub app
+    install in the Vercel and Render dashboards, then `terraform apply` with
+    `terraform.tfvars` (gitignored).
+  - The API's CORS origin is read from `CLIENT_ORIGIN` (`server/app.ts`), set by
+    terraform to the Vercel URL.
 
 ## Security note
 
@@ -98,11 +106,10 @@ was committed. State files and `terraform/.terraform/` are now gitignored —
 
 ## Known gaps (intentional, for later)
 
-- `client/Dockerfile` & `server/Dockerfile` are broken (Node 16; server image
-  never builds `dist/` or runs `prisma generate`). Unused under platform-native
-  CD — remove or fix before any Docker-based deploy.
-- `terraform/` only defines Neon resources; Vercel/Render providers are declared
-  but have no resources, and `providers.tf` configures only Neon. Finish when
-  wiring up CD.
-- Server CORS origin is hardcoded to `http://localhost:3000` in `server/app.ts`;
-  make it configurable before production.
+- Terraform state is local and gitignored; move to a remote backend for team/CI
+  use. Schema changes deploy via `prisma db push` (Render pre-deploy) — switch to
+  real Prisma migrations (`prisma migrate deploy`) for production.
+- Render starter plan cold-starts when idle, and its region (`singapore`) differs
+  from Neon (`ap-southeast-2`), adding DB latency. Tune in `terraform.tfvars`.
+- Deterministic deploy URLs assume the project/service names are free; if taken,
+  override the env vars after first apply (see `terraform/README.md`).
