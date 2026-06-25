@@ -2,12 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  fetchTasks,
-  createTask,
-  updateTask,
-  deleteTask,
-} from "@/lib/api/tasks";
+import { createTask, updateTask, deleteTask } from "@/lib/api/tasks";
 import {
   Plus,
   Pencil,
@@ -19,78 +14,65 @@ import {
   CalendarClock,
 } from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
+import { useTasks } from "@/app/hooks/useTasks";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 import Select from "@/app/components/ui/Select";
 import Card from "@/app/components/ui/Card";
 import Badge, { statusToTone } from "@/app/components/ui/Badge";
 import IconButton from "@/app/components/ui/IconButton";
+import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
+import ErrorPopup, { ToastType } from "@/app/components/Errorpopup";
 import { cn } from "@/lib/cn";
 import {
   TASK_STATUSES,
   STATUS_LABELS,
   PRIORITY_COLOR,
   DEFAULT_PRIORITY,
-  normalizeStatus,
   statusLabel,
   type TaskPriority,
 } from "@/lib/taskConstants";
 import { formatDueDate, isOverdue } from "@/lib/date";
-import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
+
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "updated", label: "Recently updated" },
+  { value: "created", label: "Recently created" },
+  { value: "due", label: "Due date" },
+  { value: "title", label: "Title A–Z" },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    items,
+    total,
+    page,
+    totalPages,
+    loading,
+    error,
+    status,
+    q,
+    sort,
+    setStatus,
+    setQ,
+    setSort,
+    setPage,
+    reload,
+  } = useTasks({ pageSize: 5 });
 
-  // Filter/search UI state
-  const [filter, setFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
-
-  // Modal states
+  // Modal + dialog state (UI only — data lives in the hook).
   const [modalOpen, setModalOpen] = useState(false);
-  const [currentTask, setCurrentTask] = useState<TaskData | undefined>(
-    undefined
-  );
-
-  // Delete confirmation target (null = dialog closed).
+  const [currentTask, setCurrentTask] = useState<TaskData | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<TaskData | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Fetch tasks on mount
+  // Auth errors from the fetch → bounce to login.
   useEffect(() => {
-    const getTasks = async () => {
-      try {
-        const data = await fetchTasks();
-        setTasks(data);
-      } catch (err) {
-        if (err instanceof Error) {
-          // If 401/403, probably not authenticated => redirect to login
-          if (err.message.includes("401") || err.message.includes("403")) {
-            router.push("/login");
-            return;
-          }
-          setError(err.message);
-        } else {
-          setError("Unknown error occurred while fetching tasks.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getTasks();
-  }, [router]);
-
-  // Reset to first page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, searchTerm]);
+    if (error && (error.includes("401") || error.includes("403"))) {
+      router.push("/login");
+    }
+  }, [error, router]);
 
   // Keyboard shortcuts: c = create, / = focus search, esc = close overlays.
   useEffect(() => {
@@ -122,24 +104,6 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Handle pagination
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const goToPage = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-  };
-
-  // Rest of your handlers...
   const handleCreateTask = () => {
     setCurrentTask(undefined);
     setModalOpen(true);
@@ -150,131 +114,75 @@ export default function DashboardPage() {
     setModalOpen(true);
   };
 
-  const handleModalSubmit = async (newOrUpdatedTask: TaskData) => {
+  const handleModalSubmit = async (t: TaskData) => {
     try {
-      if (newOrUpdatedTask.id) {
-        const updatedFromServer = await updateTask(
-          String(newOrUpdatedTask.id),
-          {
-            title: newOrUpdatedTask.title,
-            description: newOrUpdatedTask.description,
-            status: newOrUpdatedTask.status,
-            priority: newOrUpdatedTask.priority,
-            dueDate: newOrUpdatedTask.dueDate,
-          }
-        );
-
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === updatedFromServer.id ? updatedFromServer : t
-          )
-        );
-      } else {
-        const createdFromServer = await createTask({
-          title: newOrUpdatedTask.title,
-          description: newOrUpdatedTask.description,
-          status: newOrUpdatedTask.status,
-          priority: newOrUpdatedTask.priority,
-          dueDate: newOrUpdatedTask.dueDate,
+      if (t.id) {
+        await updateTask(String(t.id), {
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
         });
-
-        setTasks((prev) => [...prev, createdFromServer]);
+      } else {
+        await createTask({
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
+        });
       }
       setModalOpen(false);
+      await reload();
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error occurred while saving task.");
-      }
+      setActionError(
+        err instanceof Error ? err.message : "Failed to save task."
+      );
     }
   };
 
   const handleModalDelete = async (taskId: number) => {
     try {
       await deleteTask(String(taskId));
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
       setModalOpen(false);
+      await reload();
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error occurred while deleting task.");
-      }
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete task."
+      );
     }
   };
 
-  // Runs after the user confirms deletion in the dialog.
   const handleConfirmDelete = async () => {
     const target = deleteTarget;
     if (!target?.id) return;
     setDeleteTarget(null);
     try {
       await deleteTask(String(target.id));
-      setTasks((prev) => prev.filter((t) => t.id !== target.id));
+      await reload();
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error occurred while deleting task.");
-      }
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete task."
+      );
     }
   };
-
-  if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-        <div className="mb-6 h-8 w-40 animate-pulse rounded-md bg-surface-muted" />
-        <div className="mb-6 h-10 w-full animate-pulse rounded-lg bg-surface-muted" />
-        <ul className="flex flex-col gap-2.5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <li
-              key={i}
-              className="rounded-xl border border-border bg-surface p-4"
-            >
-              <div className="h-5 w-1/2 animate-pulse rounded bg-surface-muted" />
-              <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-surface-muted" />
-              <div className="mt-4 h-9 w-32 animate-pulse rounded-lg bg-surface-muted" />
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-24 text-center">
-        <p className="text-sm text-danger">Error loading tasks: {error}</p>
-        <Button variant="secondary" onClick={() => router.push("/login")}>
-          Re-Login
-        </Button>
-      </div>
-    );
-  }
-
-  // Filter + search
-  const filteredTasks = tasks.filter((task) => {
-    if (filter !== "all" && normalizeStatus(task.status) !== filter) return false;
-    if (
-      searchTerm &&
-      !task.title.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-      return false;
-    return true;
-  });
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
-  const indexOfLastTask = currentPage * itemsPerPage;
-  const indexOfFirstTask = indexOfLastTask - itemsPerPage;
-  const currentTasks = filteredTasks.slice(indexOfFirstTask, indexOfLastTask);
 
   const pageButton =
     "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none";
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+      {actionError && (
+        <ErrorPopup
+          message={actionError}
+          type={"danger" as ToastType}
+          onClose={() => setActionError(null)}
+          autoClose
+          duration={5000}
+        />
+      )}
+
       {/* Top header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -289,12 +197,12 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Filter & search */}
+      {/* Filter / sort / search */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="sm:w-44">
+        <div className="sm:w-40">
           <Select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
             aria-label="Filter tasks by status"
           >
             <option value="all">All tasks</option>
@@ -305,13 +213,26 @@ export default function DashboardPage() {
             ))}
           </Select>
         </div>
+        <div className="sm:w-48">
+          <Select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort tasks"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </div>
         <div className="relative flex-grow">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
             type="search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
             className="pl-9"
             placeholder="Search tasks…  ( / )"
           />
@@ -321,14 +242,27 @@ export default function DashboardPage() {
       {/* Task list */}
       <h2 className="mb-3 text-sm font-medium text-muted-foreground">
         My Tasks
-        <span className="ml-2 text-muted-foreground/70">
-          {filteredTasks.length}
-        </span>
+        <span className="ml-2 text-muted-foreground/70">{total}</span>
       </h2>
 
-      {filteredTasks.length === 0 ? (
+      {loading ? (
+        <ul className="flex flex-col gap-2.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <li
+              key={i}
+              className="rounded-xl border border-border bg-surface p-4"
+            >
+              <div className="h-5 w-1/2 animate-pulse rounded bg-surface-muted" />
+              <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-surface-muted" />
+              <div className="mt-4 h-9 w-32 animate-pulse rounded-lg bg-surface-muted" />
+            </li>
+          ))}
+        </ul>
+      ) : items.length === 0 ? (
         <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-sm text-muted-foreground">No tasks yet.</p>
+          <p className="text-sm text-muted-foreground">
+            {status !== "all" || q ? "No tasks match your filters." : "No tasks yet."}
+          </p>
           <Button variant="secondary" size="sm" onClick={handleCreateTask}>
             <Plus className="h-4 w-4" />
             Create your first task
@@ -337,12 +271,10 @@ export default function DashboardPage() {
       ) : (
         <>
           <ul className="flex flex-col gap-2.5">
-            {currentTasks.map((task) => {
-              const priority = (
-                PRIORITY_COLOR[task.priority as TaskPriority]
-                  ? (task.priority as TaskPriority)
-                  : DEFAULT_PRIORITY
-              );
+            {items.map((task) => {
+              const priority = PRIORITY_COLOR[task.priority as TaskPriority]
+                ? (task.priority as TaskPriority)
+                : DEFAULT_PRIORITY;
               const overdue = isOverdue(task.dueDate, task.status);
               return (
                 <li key={task.id}>
@@ -402,8 +334,8 @@ export default function DashboardPage() {
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-2">
               <button
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
                 className={cn(
                   pageButton,
                   "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
@@ -414,27 +346,25 @@ export default function DashboardPage() {
               </button>
 
               <div className="flex gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={cn(
-                        pageButton,
-                        currentPage === page
-                          ? "border-transparent bg-accent text-accent-foreground"
-                          : "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
-                      )}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={cn(
+                      pageButton,
+                      p === page
+                        ? "border-transparent bg-accent text-accent-foreground"
+                        : "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
 
               <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
                 className={cn(
                   pageButton,
                   "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"

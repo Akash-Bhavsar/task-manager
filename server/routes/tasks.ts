@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { authenticateToken } from '../middlewares/authenticateToken';
 import logger from '../utils/logger';
 import prisma from '../utils/prisma';
+import { Prisma } from '@prisma/client';
 import {
   DEFAULT_PRIORITY,
   DEFAULT_STATUS,
@@ -10,6 +11,23 @@ import {
 } from '../utils/taskConstants';
 
 const router = express.Router();
+
+// Map a `sort` query value to a Prisma orderBy clause.
+function sortToOrderBy(sort: string): Prisma.TaskOrderByWithRelationInput[] {
+  switch (sort) {
+    case 'created':
+      return [{ createdAt: 'desc' }];
+    case 'due':
+      return [{ dueDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }];
+    case 'title':
+      return [{ title: 'asc' }];
+    case 'position':
+      return [{ position: 'asc' }, { id: 'asc' }];
+    case 'updated':
+    default:
+      return [{ updatedAt: 'desc' }];
+  }
+}
 
 // Parse an incoming dueDate into a Date | null, or undefined if not supplied.
 function parseDueDate(value: unknown): Date | null | undefined {
@@ -38,23 +56,56 @@ router.get('/my-tasks', authenticateToken, async (req: Request, res: Response) =
   }
 });
 
-// GET all tasks: If user is ADMIN, get all tasks; otherwise get only theirs
+// GET tasks with server-side filter/search/sort/pagination.
+// ADMIN sees all tasks; USER sees only their own. Returns a paginated envelope:
+//   { items, total, page, pageSize, totalPages }
+// Query params: status, q (title search), sort, page, pageSize.
 router.get('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    // We also store the entire user payload in req.user
-    // By default we have: req.user?.id, req.user?.username, req.user?.role
-    const user = req.user!; // '!' because we know it's set if token is valid
-    logger.info(`GET /tasks called by userId=${user.id}, role=${user.role}`);
+    const user = req.user!;
+    const isAdmin = user.role === 'ADMIN';
 
-    let tasks;
-    if (user.role === 'ADMIN') {
-      tasks = await prisma.task.findMany();
-      logger.info(`ADMIN user fetched all tasks (count=${tasks.length})`);
-    } else {
-      tasks = await prisma.task.findMany({ where: { userId: user.id } });
-      logger.info(`USER userId=${user.id} fetched ${tasks.length} tasks`);
-    }
-    res.json(tasks);
+    const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const sort = typeof req.query.sort === 'string' ? req.query.sort : 'updated';
+    const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, parseInt(String(req.query.pageSize ?? '10'), 10) || 10)
+    );
+
+    // Ignore an unrecognized status (treat as "all") rather than erroring.
+    const normStatus =
+      statusParam && statusParam !== 'all' ? normalizeStatus(statusParam) : null;
+
+    const where: Prisma.TaskWhereInput = {
+      ...(isAdmin ? {} : { userId: user.id }),
+      ...(normStatus ? { status: normStatus } : {}),
+      ...(q ? { title: { contains: q, mode: 'insensitive' } } : {}),
+    };
+
+    const [total, items] = await Promise.all([
+      prisma.task.count({ where }),
+      prisma.task.findMany({
+        where,
+        orderBy: sortToOrderBy(sort),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    logger.info(
+      `GET /tasks by userId=${user.id} role=${user.role} ` +
+        `status=${normStatus ?? 'all'} q="${q}" sort=${sort} page=${page} -> ${items.length}/${total}`
+    );
+
+    res.json({
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    });
   } catch (err) {
     logger.error(`Failed to get tasks for /: ${(err as Error).message}`, { error: err });
     res.status(500).json({ error: 'Failed to get tasks' });
