@@ -8,6 +8,16 @@ import logger from '../utils/logger';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Auth cookie options. In production the client (Vercel) and API (Render) are on
+// different sites, so the cookie must be SameSite=None + Secure to be sent on
+// cross-site requests. Locally we use Lax over http.
+const isProd = process.env.env_type === 'production';
+const authCookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? ('none' as const) : ('lax' as const),
+};
+
 
 // REGISTER endpoint: Create a new user
 router.post('/register', async (req: Request, res: Response) => {
@@ -150,11 +160,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       process.env.JWT_SECRET as string,
       { expiresIn: '1d' }
     );
-    res.cookie('accessToken', token, {
-      httpOnly: true,
-      secure: process.env.env_type === 'production',
-      sameSite: 'lax'
-    });
+    res.cookie('accessToken', token, authCookieOptions);
 
     logger.info(`User id=${user.id}, username="${username}" logged in successfully`);
     res.json({ message: 'Login successful' });
@@ -192,7 +198,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response): Pr
 
 router.post('/logout', (req: Request, res: Response): void => {
   logger.info(`POST /users/logout called`);
-  res.clearCookie('accessToken');
+  res.clearCookie('accessToken', authCookieOptions);
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
