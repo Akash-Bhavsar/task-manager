@@ -79,7 +79,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 
 // PUT /tasks/:id - Update an existing task
 router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { title, description, status } = req.body as {
     title: string;
     description?: string;
@@ -117,7 +117,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
 
 // DELETE /tasks/:id - Delete a task
 router.delete('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
+  const id = String(req.params.id);
 
   try {
     const user = req.user!;

@@ -49,7 +49,7 @@ router.get('/users', authenticateToken, async (req: Request, res: Response) => {
 
 // PUT endpoint: Update a user
 router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(String(req.params.id));
   const { username, password, role } = req.body as { username: string; password?: string; role?: Role };
   // Check if the user ID from token matches the user ID from params
   if (req.userId !== userId) {
@@ -166,7 +166,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
 // DELETE endpoint: Delete a user (requires authentication)
 router.delete('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
-  const userId = parseInt(req.params.id);
+  const userId = parseInt(String(req.params.id));
 
   // Check if the user id from token matches the user id from params OR if the user is ADMIN
   const currentUser = await prisma.user.findUnique({

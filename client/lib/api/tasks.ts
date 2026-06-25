@@ -48,7 +48,7 @@ export async function createTask(taskData: TaskData) {
   return response.json();
 }
 
-export async function updateTask(taskId: string, updatedData: any) {
+export async function updateTask(taskId: string, updatedData: Partial<TaskData>) {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
     method: "PUT",
     credentials: "include",
