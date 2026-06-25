@@ -29,6 +29,9 @@ export interface TaskData {
   title: string;
   description: string;
   status: string;
+  priority?: string;
+  dueDate?: string | null;
+  position?: number;
 }
 
 export async function createTask(taskData: TaskData) {

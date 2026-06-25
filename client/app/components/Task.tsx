@@ -7,12 +7,29 @@ import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
 import Select from "@/app/components/ui/Select";
 import Button from "@/app/components/ui/Button";
+import {
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  STATUS_LABELS,
+  PRIORITY_LABELS,
+  DEFAULT_STATUS,
+  DEFAULT_PRIORITY,
+  normalizeStatus,
+} from "@/lib/taskConstants";
 
 export interface TaskData {
   id?: number;
   title: string;
   description: string;
   status: string;
+  priority?: string;
+  dueDate?: string | null;
+}
+
+// HTML date input wants YYYY-MM-DD; tolerate ISO datetime from the API.
+function toDateInput(value?: string | null): string {
+  if (!value) return "";
+  return value.slice(0, 10);
 }
 
 interface TaskProps {
@@ -37,7 +54,9 @@ const Task: React.FC<TaskProps> = ({
     id: initialTask?.id,
     title: initialTask?.title || "",
     description: initialTask?.description || "",
-    status: initialTask?.status || "Draft",
+    status: initialTask ? normalizeStatus(initialTask.status) : DEFAULT_STATUS,
+    priority: initialTask?.priority || DEFAULT_PRIORITY,
+    dueDate: toDateInput(initialTask?.dueDate),
   });
 
   useEffect(() => {
@@ -46,7 +65,9 @@ const Task: React.FC<TaskProps> = ({
       id: initialTask?.id,
       title: initialTask?.title || "",
       description: initialTask?.description || "",
-      status: initialTask?.status || "Draft",
+      status: initialTask ? normalizeStatus(initialTask.status) : DEFAULT_STATUS,
+      priority: initialTask?.priority || DEFAULT_PRIORITY,
+      dueDate: toDateInput(initialTask?.dueDate),
     });
   }, [initialTask]);
 
@@ -171,23 +192,63 @@ const Task: React.FC<TaskProps> = ({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="taskStatus"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Status
+              </label>
+              <Select
+                id="taskStatus"
+                name="status"
+                value={normalizeStatus(task.status)}
+                onChange={handleChange}
+              >
+                {TASK_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="taskPriority"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Priority
+              </label>
+              <Select
+                id="taskPriority"
+                name="priority"
+                value={task.priority || DEFAULT_PRIORITY}
+                onChange={handleChange}
+              >
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {PRIORITY_LABELS[p]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
           <div>
             <label
-              htmlFor="taskStatus"
+              htmlFor="taskDueDate"
               className="mb-1.5 block text-sm font-medium text-foreground"
             >
-              Status
+              Due date
             </label>
-            <Select
-              id="taskStatus"
-              name="status"
-              value={task.status}
+            <Input
+              id="taskDueDate"
+              name="dueDate"
+              type="date"
+              value={task.dueDate || ""}
               onChange={handleChange}
-            >
-              <option value="Draft">Draft</option>
-              <option value="in-progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </Select>
+            />
           </div>
 
           {/* Action buttons */}

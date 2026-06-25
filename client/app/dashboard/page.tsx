@@ -25,6 +25,12 @@ import Card from "@/app/components/ui/Card";
 import Badge, { statusToTone } from "@/app/components/ui/Badge";
 import IconButton from "@/app/components/ui/IconButton";
 import { cn } from "@/lib/cn";
+import {
+  TASK_STATUSES,
+  STATUS_LABELS,
+  normalizeStatus,
+  statusLabel,
+} from "@/lib/taskConstants";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -113,6 +119,8 @@ export default function DashboardPage() {
             title: newOrUpdatedTask.title,
             description: newOrUpdatedTask.description,
             status: newOrUpdatedTask.status,
+            priority: newOrUpdatedTask.priority,
+            dueDate: newOrUpdatedTask.dueDate,
           }
         );
 
@@ -126,6 +134,8 @@ export default function DashboardPage() {
           title: newOrUpdatedTask.title,
           description: newOrUpdatedTask.description,
           status: newOrUpdatedTask.status,
+          priority: newOrUpdatedTask.priority,
+          dueDate: newOrUpdatedTask.dueDate,
         });
 
         setTasks((prev) => [...prev, createdFromServer]);
@@ -188,7 +198,7 @@ export default function DashboardPage() {
 
   // Filter + search
   const filteredTasks = tasks.filter((task) => {
-    if (filter !== "all" && task.status !== filter) return false;
+    if (filter !== "all" && normalizeStatus(task.status) !== filter) return false;
     if (
       searchTerm &&
       !task.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -231,8 +241,11 @@ export default function DashboardPage() {
             aria-label="Filter tasks by status"
           >
             <option value="all">All tasks</option>
-            <option value="completed">Completed</option>
-            <option value="in-progress">In Progress</option>
+            {TASK_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
           </Select>
         </div>
         <div className="relative flex-grow">
@@ -274,7 +287,7 @@ export default function DashboardPage() {
                       {task.title}
                     </h3>
                     <Badge tone={statusToTone(task.status)}>
-                      {task.status.toUpperCase()}
+                      {statusLabel(task.status)}
                     </Badge>
                   </div>
                   {task.description && (

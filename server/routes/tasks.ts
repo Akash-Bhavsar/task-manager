@@ -2,8 +2,22 @@ import express, { Request, Response } from 'express';
 import { authenticateToken } from '../middlewares/authenticateToken';
 import logger from '../utils/logger';
 import prisma from '../utils/prisma';
+import {
+  DEFAULT_PRIORITY,
+  DEFAULT_STATUS,
+  normalizePriority,
+  normalizeStatus,
+} from '../utils/taskConstants';
 
 const router = express.Router();
+
+// Parse an incoming dueDate into a Date | null, or undefined if not supplied.
+function parseDueDate(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const d = new Date(value as string);
+  return isNaN(d.getTime()) ? undefined : d;
+}
 
 // GET tasks for the authenticated user
 router.get('/my-tasks', authenticateToken, async (req: Request, res: Response) => {
@@ -49,11 +63,30 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 
 // POST /tasks - Create a new task
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
-  const { title, description, status } = req.body as {
+  const { title, description, status, priority, dueDate } = req.body as {
     title: string;
     description?: string;
-    status: string;
+    status?: string;
+    priority?: string;
+    dueDate?: string | null;
   };
+
+  if (!title || !title.trim()) {
+    res.status(400).json({ error: 'Title is required' });
+    return;
+  }
+
+  const normStatus = status === undefined ? DEFAULT_STATUS : normalizeStatus(status);
+  if (normStatus === null) {
+    res.status(400).json({ error: 'Invalid status' });
+    return;
+  }
+  const normPriority = priority === undefined ? DEFAULT_PRIORITY : normalizePriority(priority);
+  if (normPriority === null) {
+    res.status(400).json({ error: 'Invalid priority' });
+    return;
+  }
+  const due = parseDueDate(dueDate);
 
   try {
     const user = req.user!;
@@ -63,7 +96,9 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       data: {
         title,
         description,
-        status,
+        status: normStatus,
+        priority: normPriority,
+        dueDate: due ?? null,
         userId: user.id,
       },
     });
@@ -79,11 +114,52 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 // PUT /tasks/:id - Update an existing task
 router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   const id = String(req.params.id);
-  const { title, description, status } = req.body as {
-    title: string;
+  const { title, description, status, priority, dueDate, position } = req.body as {
+    title?: string;
     description?: string;
-    status: string;
+    status?: string;
+    priority?: string;
+    dueDate?: string | null;
+    position?: number;
   };
+
+  // Build a partial update — only touch fields that were supplied.
+  const data: {
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    dueDate?: Date | null;
+    position?: number;
+  } = {};
+
+  if (title !== undefined) data.title = title;
+  if (description !== undefined) data.description = description;
+  if (status !== undefined) {
+    const s = normalizeStatus(status);
+    if (s === null) {
+      res.status(400).json({ error: 'Invalid status' });
+      return;
+    }
+    data.status = s;
+  }
+  if (priority !== undefined) {
+    const p = normalizePriority(priority);
+    if (p === null) {
+      res.status(400).json({ error: 'Invalid priority' });
+      return;
+    }
+    data.priority = p;
+  }
+  if (dueDate !== undefined) {
+    const due = parseDueDate(dueDate);
+    if (due === undefined && dueDate !== undefined) {
+      res.status(400).json({ error: 'Invalid dueDate' });
+      return;
+    }
+    data.dueDate = due ?? null;
+  }
+  if (position !== undefined) data.position = position;
 
   try {
     const user = req.user!;
@@ -92,7 +168,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
     // updateMany returns the count of updated records
     const result = await prisma.task.updateMany({
       where: { id: parseInt(id), userId: user.id },
-      data: { title, description, status },
+      data,
     });
 
     if (result.count === 0) {
