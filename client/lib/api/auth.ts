@@ -1,7 +1,11 @@
 'use client'
-// Manage Use session to the entire application
+// Session is managed by the API via an httpOnly `accessToken` cookie. The
+// browser sends it automatically with `credentials: 'include'`, so there is no
+// token to store client-side (storing JWTs in localStorage is XSS-exposed).
+const API = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+
 export async function loginUser(username: string, password: string) {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/login`, {
+    const res = await fetch(`${API}/api/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -11,23 +15,13 @@ export async function loginUser(username: string, password: string) {
     if (!res.ok) {
         throw new Error("Invalid credentials");
     }
-    const data = await res.json();
-
-    localStorage.setItem("token", data.token);
-
-    // Set token expiration in localStorage
-    const expirationTime = new Date().getTime() + 60 * 60 * 1000; // 1 hour from now
-    localStorage.setItem("tokenExpiration", expirationTime.toString());
-    return data;
+    return res.json();
 }
 
 export async function fetchUserInfo() {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/me`, {
+    const res = await fetch(`${API}/api/users/me`, {
         method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
+        headers: { "Content-Type": "application/json" },
         credentials: 'include'
     });
 
@@ -38,22 +32,8 @@ export async function fetchUserInfo() {
     return res.json();
 }
 
-export function logoutUser() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("tokenExpiration");
-
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/logout`, {
-        method: "POST",
-        credentials: 'include'
-    }).catch(err => console.error("Logout error:", err));
-
-    if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-    }
-}
-
 export async function signupUser(username: string, password: string) {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/register`, {
+    const res = await fetch(`${API}/api/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -64,4 +44,15 @@ export async function signupUser(username: string, password: string) {
         throw new Error("Signup failed");
     }
     return res.json();
+}
+
+export function logoutUser() {
+    fetch(`${API}/api/users/logout`, {
+        method: "POST",
+        credentials: 'include'
+    }).catch(err => console.error("Logout error:", err));
+
+    if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+    }
 }

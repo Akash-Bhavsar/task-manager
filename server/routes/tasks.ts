@@ -1,10 +1,9 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middlewares/authenticateToken';
 import logger from '../utils/logger';
+import prisma from '../utils/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET tasks for the authenticated user
 router.get('/my-tasks', authenticateToken, async (req: Request, res: Response) => {

@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { authenticateToken } from '../middlewares/authenticateToken';
 import logger from '../utils/logger';
+import prisma from '../utils/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Auth cookie options. In production the client (Vercel) and API (Render) are on
 // different sites, so the cookie must be SameSite=None + Secure to be sent on
@@ -16,6 +16,7 @@ const authCookieOptions = {
   httpOnly: true,
   secure: isProd,
   sameSite: isProd ? ('none' as const) : ('lax' as const),
+  maxAge: 24 * 60 * 60 * 1000, // 1 day, matches the JWT expiry
 };
 
 
