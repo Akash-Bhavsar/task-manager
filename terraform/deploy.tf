@@ -1,19 +1,21 @@
-# Client (Vercel) + server (Render) with git-native auto-deploy on push to the
-# production branch. The Neon database is defined in neon.tf.
+# Client (Vercel) + server (Render), git-native auto-deploy on push to the
+# production branch. Neon DB is in neon.tf.
 #
-# URLs are derived deterministically from the project/service names so the two
-# sides can reference each other without a dependency cycle. If a name is already
-# taken, the platform appends a suffix and these URLs will be wrong — keep names
-# unique, or override them after the first apply.
+# Render's FREE tier cannot be managed by the Terraform provider (no "free"
+# plan), so the Render service is OFF by default (manage_render = false) and
+# created manually in the dashboard — see terraform/README.md. Set
+# manage_render = true only on a paid plan (starter+).
+#
+# Real deploy URLs are passed in as variables (var.api_url, var.client_origins)
+# because the platforms append a random suffix to the hostname, so they can't be
+# derived from the names.
 
 locals {
-  repo_url   = "https://github.com/${var.github_repo}"
-  server_url = "https://${var.render_service_name}.onrender.com"
-  client_url = "https://${var.vercel_project_name}.vercel.app"
+  repo_url = "https://github.com/${var.github_repo}"
 }
 
 # ---------------------------------------------------------------------------
-# Client: Next.js on Vercel
+# Client: Next.js on Vercel (always managed)
 # ---------------------------------------------------------------------------
 
 resource "vercel_project" "client" {
@@ -30,17 +32,19 @@ resource "vercel_project" "client" {
   environment = [
     {
       key    = "NEXT_PUBLIC_API_URL"
-      value  = local.server_url
+      value  = var.api_url
       target = ["production", "preview"]
     },
   ]
 }
 
 # ---------------------------------------------------------------------------
-# Server: Express API on Render (native Node runtime, builds from repo)
+# Server: Express API on Render (paid plans only; manage_render = true)
 # ---------------------------------------------------------------------------
 
 resource "render_web_service" "server" {
+  count = var.manage_render ? 1 : 0
+
   name               = var.render_service_name
   plan               = var.render_plan
   region             = var.render_region
@@ -59,10 +63,11 @@ resource "render_web_service" "server" {
   }
 
   env_vars = {
-    DATABASE_URL = { value = neon_project.db.connection_uri_pooler }
-    JWT_SECRET   = { value = var.jwt_secret }
-    CLIENT_ORIGIN = { value = local.client_url }
-    NODE_VERSION = { value = "20" }
-    env_type     = { value = "production" }
+    DATABASE_URL        = { value = neon_project.db.connection_uri_pooler }
+    JWT_SECRET          = { value = var.jwt_secret }
+    CLIENT_ORIGIN       = { value = var.client_origins }
+    CLIENT_ORIGIN_REGEX = { value = var.client_origin_regex }
+    NODE_VERSION        = { value = "20" }
+    env_type            = { value = "production" }
   }
 }

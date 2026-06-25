@@ -1,15 +1,15 @@
-output "client_url" {
-  value       = local.client_url
-  description = "Production URL of the Vercel client"
-}
-
-output "server_url" {
-  value       = local.server_url
-  description = "Public URL of the Render API"
+output "api_url" {
+  value       = var.api_url
+  description = "Render API base URL injected into the client"
 }
 
 output "database_url" {
   value       = neon_project.db.connection_uri_pooler
   description = "Pooled Neon connection string used by the API"
   sensitive   = true
+}
+
+output "render_service_url" {
+  value       = coalesce(one(render_web_service.server[*].url), "(unmanaged — created in Render dashboard)")
+  description = "Render service URL when managed by Terraform"
 }

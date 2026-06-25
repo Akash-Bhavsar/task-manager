@@ -1,4 +1,8 @@
 # Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored (*.tfvars).
+#
+# Path A (free): Terraform manages Neon + Vercel. Render is created MANUALLY in
+# the dashboard (free tier). Leave manage_render = false and the render_* vars
+# blank.
 
 # --- Neon ---
 neon_api_key = "neon_xxx"
@@ -7,16 +11,23 @@ neon_api_key = "neon_xxx"
 github_repo = "Akash-Bhavsar/task-manager"
 
 # --- Vercel (client) ---
-vercel_api_token = "xxxxxxxx"
-# vercel_team_id = "team_xxx"        # only if the project is under a team
+vercel_api_token    = "xxxxxxxx"
+# vercel_team_id    = "team_xxx"      # only if the project is under a team
 vercel_project_name = "task-manager-client"
 
-# --- Render (server) ---
-render_api_key      = "rnd_xxxxxxxx"
-render_owner_id     = "tea-xxxxxxxx"   # or usr-xxxxxxxx; see `render owners` / API
-render_service_name = "task-manager-api"
-render_region       = "singapore"
-render_plan         = "starter"   # provider has no "free" tier — starter is cheapest
+# Real Render API URL -> injected as NEXT_PUBLIC_API_URL in the client.
+api_url = "https://task-manager-n1hi.onrender.com"
 
-# --- App secrets ---
-jwt_secret = "use-a-long-random-string"
+# --- Render (server) ---
+# Free tier: keep this false and create the service in the dashboard.
+manage_render = false
+
+# Only needed when manage_render = true (paid plan, starter+):
+# render_api_key      = "rnd_xxxxxxxx"
+# render_owner_id     = "tea-xxxxxxxx"
+# render_service_name = "task-manager-api"
+# render_region       = "singapore"
+# render_plan         = "starter"
+# jwt_secret          = "use-a-long-random-string"
+# client_origins      = "https://task-manager-xxxx.vercel.app"
+# client_origin_regex = "^https://task-manager-[a-z0-9-]+\\.vercel\\.app$"

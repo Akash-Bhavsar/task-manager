@@ -54,19 +54,46 @@ variable "vercel_project_name" {
   description = "Vercel project name. Production URL is https://<name>.vercel.app"
 }
 
+variable "api_url" {
+  type        = string
+  description = "Render API base URL, injected into the client as NEXT_PUBLIC_API_URL (e.g. https://task-manager-n1hi.onrender.com)"
+}
+
 # ---------------------------------------------------------------------------
-# Render (server)
+# Render (server). manage_render = false (default) => Render is created manually
+# in the dashboard (required for the free tier). render_* creds are only needed
+# when manage_render = true.
 # ---------------------------------------------------------------------------
+
+variable "manage_render" {
+  type        = bool
+  default     = false
+  description = "Manage the Render web service via Terraform. Requires a paid plan (starter+); free tier is unsupported by the provider."
+}
+
+variable "client_origins" {
+  type        = string
+  default     = ""
+  description = "Comma-separated CORS allowlist for the API (CLIENT_ORIGIN). Only used when manage_render = true."
+}
+
+variable "client_origin_regex" {
+  type        = string
+  default     = ""
+  description = "Regex of allowed origins for preview URLs (CLIENT_ORIGIN_REGEX). Only used when manage_render = true."
+}
 
 variable "render_api_key" {
   type        = string
   sensitive   = true
-  description = "Render API key (Account Settings > API Keys)"
+  default     = ""
+  description = "Render API key (Account Settings > API Keys). Needed only when manage_render = true."
 }
 
 variable "render_owner_id" {
   type        = string
-  description = "Render owner/team ID that owns the service"
+  default     = ""
+  description = "Render owner/team ID. Needed only when manage_render = true."
 }
 
 variable "render_service_name" {
@@ -99,5 +126,6 @@ variable "render_plan" {
 variable "jwt_secret" {
   type        = string
   sensitive   = true
-  description = "JWT signing secret for the API"
+  default     = ""
+  description = "JWT signing secret for the API. Only used when manage_render = true (otherwise set it in the Render dashboard)."
 }
