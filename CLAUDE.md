@@ -96,6 +96,12 @@ CI uses).
     `terraform.tfvars` (gitignored).
   - The API's CORS origin is read from `CLIENT_ORIGIN` (`server/app.ts`), set by
     terraform to the Vercel URL.
+  - **Render free tier:** the Render Terraform provider does NOT support free web
+    services (`starter` is its cheapest). For a free deploy, create the Render
+    service manually in the dashboard using the **Docker** runtime — `server/`
+    has a working `server/Dockerfile` (Node 20; runs `prisma db push` then
+    starts). Set env vars there: `DATABASE_URL`, `JWT_SECRET`, `CLIENT_ORIGIN`.
+    Leave Render's pre-deploy command empty (the image's CMD handles db push).
 
 ## Security note
 
