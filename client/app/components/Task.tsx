@@ -60,7 +60,10 @@ const Task: React.FC<TaskProps> = ({
   });
 
   useEffect(() => {
-    // Update local state if the parent changes "initialTask"
+    // Re-initialize the form each time the modal opens (or the edited task
+    // changes). Keying on `isOpen` is what resets the form after a create —
+    // otherwise a second "Create" keeps the previous task's values.
+    if (!isOpen) return;
     setTask({
       id: initialTask?.id,
       title: initialTask?.title || "",
@@ -69,7 +72,7 @@ const Task: React.FC<TaskProps> = ({
       priority: initialTask?.priority || DEFAULT_PRIORITY,
       dueDate: toDateInput(initialTask?.dueDate),
     });
-  }, [initialTask]);
+  }, [initialTask, isOpen]);
 
   // Toast / Error management
   const [toast, setToast] = useState<{
@@ -140,7 +143,7 @@ const Task: React.FC<TaskProps> = ({
       )}
 
       {/* Modal container */}
-      <div className="relative w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl animate-scale-in">
+      <div className="relative w-full max-w-xl rounded-xl border border-border bg-surface p-8 shadow-xl animate-scale-in">
         {/* Close button */}
         <button
           type="button"
