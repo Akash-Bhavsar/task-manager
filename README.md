@@ -57,6 +57,18 @@ Git-native CD — push to `main` → Vercel (client) + Render (API) rebuild; Neo
 - Provisioning + manual steps: `terraform/README.md` (Path A = free).
 - Render free service runs the `server/Dockerfile` (Docker runtime).
 
+## Screenshots
+
+| | |
+|---|---|
+| Homepage | ![Homepage](/public/Homepage.webp) |
+| Dashboard | ![Dashboard](/public/Dashboard.webp) |
+| Login | ![Login](/public/LoginPage.webp) |
+| Signup | ![Signup](/public/SignupPage.webp) |
+| Create task | ![Create Task](/public/CreateTask.webp) |
+| Edit task | ![Edit Task](/public/EditTask.webp) |
+| Filters | ![Filters](/public/Filters.webp) |
+
 ## License
 
 MIT — see `LICENSE`.
