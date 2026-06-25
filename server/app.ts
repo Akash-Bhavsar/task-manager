@@ -11,12 +11,26 @@ dotenv.config();
 
 const app = express();
 
-// Allowed browser origin for CORS. Set CLIENT_ORIGIN in production to the
-// deployed client URL (e.g. https://<project>.vercel.app).
-const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:3000';
+// CORS allowlist. CLIENT_ORIGIN is a comma-separated list of exact origins
+// (e.g. "http://localhost:3000,https://task-manager-phi-eight-69.vercel.app").
+// CLIENT_ORIGIN_REGEX optionally allows changing preview URLs, e.g.
+// "^https://task-manager-[a-z0-9-]+\\.vercel\\.app$".
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+const originRegex = process.env.CLIENT_ORIGIN_REGEX
+  ? new RegExp(process.env.CLIENT_ORIGIN_REGEX)
+  : null;
 
 app.use(cors({
-  origin: clientOrigin,
+  origin(origin, callback) {
+    // No Origin header = same-origin or non-browser client (curl, server-to-server).
+    if (!origin || allowedOrigins.includes(origin) || originRegex?.test(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
   credentials: true
 }));
 const port = process.env.PORT || 3000;
