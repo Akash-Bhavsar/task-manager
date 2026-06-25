@@ -44,14 +44,15 @@ resource "render_web_service" "server" {
   name               = var.render_service_name
   plan               = var.render_plan
   region             = var.render_region
-  start_command      = "cd server && npm start"
-  pre_deploy_command = "cd server && npx prisma db push"
+  root_directory     = "server"
+  start_command      = "npm start"
+  pre_deploy_command = "npx prisma db push"
 
   runtime_source = {
     native_runtime = {
       auto_deploy   = true
       branch        = var.production_branch
-      build_command = "cd server && npm ci && npx prisma generate && npm run build"
+      build_command = "npm ci && npx prisma generate && npm run build"
       repo_url      = local.repo_url
       runtime       = "node"
     }

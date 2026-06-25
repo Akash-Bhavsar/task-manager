@@ -84,7 +84,12 @@ variable "render_region" {
 variable "render_plan" {
   type        = string
   default     = "starter"
-  description = "Render plan (starter|standard|pro|...)"
+  description = "Render plan. The provider does NOT support free-tier web services; starter is the cheapest."
+
+  validation {
+    condition     = contains(["starter", "standard", "pro", "pro_plus", "pro_max", "pro_ultra"], var.render_plan)
+    error_message = "render_plan must be one of starter, standard, pro, pro_plus, pro_max, pro_ultra. 'free' is not supported by the Render Terraform provider — create a free service in the dashboard instead."
+  }
 }
 
 # ---------------------------------------------------------------------------

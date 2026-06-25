@@ -16,7 +16,7 @@ render_api_key      = "rnd_xxxxxxxx"
 render_owner_id     = "tea-xxxxxxxx"   # or usr-xxxxxxxx; see `render owners` / API
 render_service_name = "task-manager-api"
 render_region       = "singapore"
-render_plan         = "starter"
+render_plan         = "starter"   # provider has no "free" tier — starter is cheapest
 
 # --- App secrets ---
 jwt_secret = "use-a-long-random-string"

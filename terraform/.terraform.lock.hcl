@@ -6,6 +6,7 @@ provider "registry.terraform.io/kislerdm/neon" {
   constraints = "~> 0.8"
   hashes = [
     "h1:4bjLNwgd4tuu+aEqG59VOujWnR6zOrI6n8idOQrfW0M=",
+    "h1:QHRIgwPsB473BWYNpZ1GDhZ3+Fq4jBsJzPD79w99avs=",
     "zh:089bbdb4da7fd00402e59d60a81d92df72160bf1bb409ae57c9ca0609f35879a",
     "zh:1866497b239841b68309092c400308c1a4537f8d7588ce46e85f5875f9ddb69d",
     "zh:253d2c0dae4f1b7e61294efcc0f60acddf8c5dcbea2d875861621dc5f6605002",
@@ -28,6 +29,7 @@ provider "registry.terraform.io/render-oss/render" {
   version     = "1.6.0"
   constraints = "~> 1.4"
   hashes = [
+    "h1:oSpbsjwV48zV6cEggkqLCPPCC8exKnhyqFK+0NAC4no=",
     "h1:tezGDvkWSN0uy74gHLI36JfJCzSRAspdQSvtljSzi1o=",
     "zh:0d945cb93f5737659a6eb7049e580bef0997d71c599d2d4758205bf8c6e9fe55",
     "zh:1f535dce2715683dce378aa4595ed1dc47fdf1d2ab451ba41281a4da662abb5d",
@@ -52,6 +54,7 @@ provider "registry.terraform.io/vercel/vercel" {
   constraints = "~> 1.3"
   hashes = [
     "h1:+LfNcI59XOHxgC2iukjO6LwtjzVYm6NdFplGhbhspdA=",
+    "h1:zykWuEbcObgtUc2Gq6N3cIcD0sKSf9mbnf9zCYvQoao=",
     "zh:42cc63beffd99b00bcddc9291762165db032763d61430c2983e1f44b1ef07b52",
     "zh:4d55cdb82abca2022e972e1a459427c66ad9441747042fca39c525108c47c052",
     "zh:6aa50e2487cf622cb2401c3b772d48840f463d7335fbe2f05d6128abeac0c8ec",
