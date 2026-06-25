@@ -11,6 +11,10 @@ dotenv.config();
 
 const app = express();
 
+// Behind Render/Cloudflare. Trust the proxy so secure cookies, req.ip and
+// req.secure work correctly.
+app.set('trust proxy', 1);
+
 // CORS allowlist. CLIENT_ORIGIN is a comma-separated list of exact origins
 // (e.g. "http://localhost:3000,https://task-manager-phi-eight-69.vercel.app").
 // CLIENT_ORIGIN_REGEX optionally allows changing preview URLs, e.g.
@@ -29,7 +33,10 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || originRegex?.test(origin)) {
       return callback(null, true);
     }
-    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    // Deny without throwing: the browser blocks the response (no CORS headers)
+    // and we avoid noisy 500s from an unhandled error.
+    logger.warn(`Blocked CORS origin: ${origin}`);
+    callback(null, false);
   },
   credentials: true
 }));
