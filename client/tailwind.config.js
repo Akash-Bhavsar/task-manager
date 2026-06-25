@@ -1,14 +1,13 @@
+/**
+ * Tailwind v4 is configured primarily from CSS (`app/globals.css`):
+ * the semantic color tokens live in `@theme inline` and dark mode is a
+ * class-based `@custom-variant`. This file only pins content sources and
+ * the dark mode strategy.
+ */
 module.exports = {
-    theme: {
-      extend: {
-        colors: {
-          redish: '#EE6055',
-          greenish: '#60D394',
-          lightGreen: '#AAF683',
-          yellowish: '#FFD97D',
-          peachy: '#FF9B85',
-        },
-      },
-    },
-    // ... other Tailwind config
-  };
+  darkMode: "class",
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+  ],
+};

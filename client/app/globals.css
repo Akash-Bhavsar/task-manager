@@ -1,73 +1,148 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (toggled by next-themes on <html class="dark">) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Semantic design tokens — a near-monochrome neutral scale with a single
+ * restrained emerald accent. Every surface in the app reads from these, so
+ * light/dark mode flips automatically without per-component dark: classes.
+ */
 :root {
-  --redish: #EE6055;
-  --greenish: #60D394;
-  --lightGreen: #AAF683;
-  --yellowish: #FFD97D;
-  --peachy: #FF9B85;
-  --background: #ffffff;
-  --foreground: #171717;
-  --tw-shadow-color: #000; /* Add this line */
+  --background: #fafafa;
+  --surface: #ffffff;
+  --surface-muted: #f4f4f5;
+
+  --border: #ececec;
+  --border-strong: #d8d8dc;
+
+  --foreground: #18181b;
+  --muted-foreground: #71717a;
+
+  --accent: #059669;
+  --accent-foreground: #ffffff;
+  --accent-hover: #047857;
+
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+
+  --ring: #05966933;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --surface: #131316;
+  --surface-muted: #1b1b1f;
+
+  --border: #26262b;
+  --border-strong: #36363d;
+
+  --foreground: #ededed;
+  --muted-foreground: #9a9aa3;
+
+  --accent: #10b981;
+  --accent-foreground: #04140d;
+  --accent-hover: #34d399;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #f87171;
+
+  --ring: #10b98140;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
   --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Add the following to make the colors available in Tailwind */
-.bg-redish {
-  background-color: var(--redish);
+/* Tighter tracking for large display headings, plain.so style */
+h1,
+h2 {
+  letter-spacing: -0.02em;
 }
 
-.text-redish {
-  color: var(--redish);
+/* Subtle background grid used on the landing hero */
+.hero-grid {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 40%, #000 30%, transparent 75%);
 }
 
-.bg-greenish {
-  background-color: var(--greenish);
+/* Motion — used by the task modal + toast */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.text-greenish {
-  color: var(--greenish);
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-.bg-lightGreen {
-  background-color: var(--lightGreen);
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.text-lightGreen {
-  color: var(--lightGreen);
+.animate-scale-in {
+  animation: scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.bg-yellowish {
-  background-color: var(--yellowish);
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
 }
 
-.text-yellowish {
-  color: var(--yellowish);
-}
-
-.bg-peachy {
-  background-color: var(--peachy);
-}
-
-.text-peachy {
-  color: var(--peachy);
+.animate-toast-in {
+  animation: toast-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }

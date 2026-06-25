@@ -8,8 +8,23 @@ import {
   updateTask,
   deleteTask,
 } from "@/lib/api/tasks";
-import { FaEdit, FaTrash, FaTasks, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ListTodo,
+} from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
+import Button from "@/app/components/ui/Button";
+import Input from "@/app/components/ui/Input";
+import Select from "@/app/components/ui/Select";
+import Card from "@/app/components/ui/Card";
+import Badge, { statusToTone } from "@/app/components/ui/Badge";
+import IconButton from "@/app/components/ui/IconButton";
+import { cn } from "@/lib/cn";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,8 +32,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Dropdown & filter/search UI state
-  const [showDropdown, setShowDropdown] = useState(false);
+  // Filter/search UI state
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -103,7 +117,9 @@ export default function DashboardPage() {
         );
 
         setTasks((prev) =>
-          prev.map((t) => (t.id === updatedFromServer.id ? updatedFromServer : t))
+          prev.map((t) =>
+            t.id === updatedFromServer.id ? updatedFromServer : t
+          )
         );
       } else {
         const createdFromServer = await createTask({
@@ -153,26 +169,19 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-lightGreen p-4">
-        <h2 className="text-xl font-semibold text-foreground">
-          Loading tasks...
-        </h2>
+      <div className="flex flex-1 items-center justify-center px-6 py-24">
+        <p className="text-sm text-muted-foreground">Loading tasks…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-redish p-4">
-        <h2 className="text-xl font-semibold text-background">
-          Error loading tasks: {error}
-        </h2>
-        <button
-          onClick={() => router.push("/login")}
-          className="mt-4 bg-yellowish hover:bg-yellow-400 text-background py-2 px-4 rounded focus:outline-none transition"
-        >
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-24 text-center">
+        <p className="text-sm text-danger">Error loading tasks: {error}</p>
+        <Button variant="secondary" onClick={() => router.push("/login")}>
           Re-Login
-        </button>
+        </Button>
       </div>
     );
   }
@@ -194,213 +203,157 @@ export default function DashboardPage() {
   const indexOfFirstTask = indexOfLastTask - itemsPerPage;
   const currentTasks = filteredTasks.slice(indexOfFirstTask, indexOfLastTask);
 
+  const pageButton =
+    "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none";
+
   return (
-    <div className="min-h-screen bg-green-50 p-6">
-      <div className="max-w-3xl bg-green-25 mx-auto rounded-md shadow-md p-6">
-        {/* Top Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FaTasks className="text-foreground" />
-              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            </div>
-            <button
-              onClick={handleCreateTask}
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-green-400 flex items-center gap-2"
-            >
-              <FaPlus />
-              Create Task
-            </button>
-          </div>
-
-          {/* Filter & search */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="shrink-0 z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-foreground bg-green-100 border border-yellowish rounded-lg hover:bg-green-200 focus:outline-none"
-                  type="button"
-                >
-                  Filter by: {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  <svg
-                    className="w-2.5 h-2.5 ms-2.5"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 10 6"
-                  >
-                    <path
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="m1 1 4 4 4-4"
-                    />
-                  </svg>
-                </button>
-                {showDropdown && (
-                  <div className="absolute z-10 mt-1 bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-44">
-                    <ul className="py-2 text-sm text-foreground">
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilter("all");
-                            setShowDropdown(false);
-                          }}
-                          className="inline-flex w-full px-4 py-2 hover:bg-green-100"
-                        >
-                          All
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilter("completed");
-                            setShowDropdown(false);
-                          }}
-                          className="inline-flex w-full px-4 py-2 hover:bg-green-100"
-                        >
-                          Completed
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilter("in-progress");
-                            setShowDropdown(false);
-                          }}
-                          className="inline-flex w-full px-4 py-2 hover:bg-green-100"
-                        >
-                          In Progress
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Search bar */}
-              <div className="relative flex-grow">
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block p-2.5 w-full text-sm text-foreground bg-white rounded-lg border border-yellowish focus:ring-greenish focus:border-greenish"
-                  placeholder="Search tasks..."
-                />
-              </div>
-            </div>
-          </div>
+    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+      {/* Top header */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <ListTodo className="h-5 w-5 text-muted-foreground" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Dashboard
+          </h1>
         </div>
+        <Button onClick={handleCreateTask}>
+          <Plus className="h-4 w-4" />
+          Create Task
+        </Button>
+      </div>
 
-        {/* Task List */}
-        <h2 className="text-xl font-semibold text-foreground mb-4">My Tasks</h2>
-        {filteredTasks.length === 0 ? (
-          <div className="text-foreground">No tasks available.</div>
-        ) : (
-          <>
-            <ul className="space-y-3">
-              {currentTasks.map((task) => (
-                <li
-                  key={task.id}
-                  className="p-4 border border-yellowish rounded-lg shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-lg text-foreground">
+      {/* Filter & search */}
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="sm:w-44">
+          <Select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Filter tasks by status"
+          >
+            <option value="all">All tasks</option>
+            <option value="completed">Completed</option>
+            <option value="in-progress">In Progress</option>
+          </Select>
+        </div>
+        <div className="relative flex-grow">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+            placeholder="Search tasks…"
+          />
+        </div>
+      </div>
+
+      {/* Task list */}
+      <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+        My Tasks
+        <span className="ml-2 text-muted-foreground/70">
+          {filteredTasks.length}
+        </span>
+      </h2>
+
+      {filteredTasks.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">No tasks yet.</p>
+          <Button variant="secondary" size="sm" onClick={handleCreateTask}>
+            <Plus className="h-4 w-4" />
+            Create your first task
+          </Button>
+        </Card>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-2.5">
+            {currentTasks.map((task) => (
+              <li key={task.id}>
+                <Card className="p-4 transition-colors hover:border-border-strong">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-medium text-foreground">
                       {task.title}
-                    </div>
-                    <span
-                      className={
-                        task.status === "completed"
-                          ? "text-greenish font-semibold ml-2"
-                          : "text-orange-500 font-semibold ml-2"
-                      }
-                    >
+                    </h3>
+                    <Badge tone={statusToTone(task.status)}>
                       {task.status.toUpperCase()}
-                    </span>
+                    </Badge>
                   </div>
-                  <p className="text-foreground overflow-hidden">
-                    {task.description.length > 80
-                      ? task.description.slice(0, 80) + "..."
-                      : task.description}
-                  </p>
+                  {task.description && (
+                    <p className="mt-1.5 text-sm text-muted-foreground">
+                      {task.description.length > 120
+                        ? task.description.slice(0, 120) + "…"
+                        : task.description}
+                    </p>
+                  )}
 
-                  {/* Edit & Delete buttons */}
                   <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => handleEditTask(task)}
-                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
-                    >
-                      <FaEdit className="mr-2" />
+                    <IconButton onClick={() => handleEditTask(task)}>
+                      <Pencil className="h-3.5 w-3.5" />
                       Edit
-                    </button>
-                    <button
+                    </IconButton>
+                    <IconButton
+                      variant="danger"
                       onClick={() => handleInlineDelete(task.id!)}
-                      className="bg-redish hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
                     >
-                      <FaTrash className="mr-2" />
+                      <Trash2 className="h-3.5 w-3.5" />
                       Delete
-                    </button>
+                    </IconButton>
                   </div>
-                </li>
-              ))}
-            </ul>
+                </Card>
+              </li>
+            ))}
+          </ul>
 
-            {/* Pagination controls */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center mt-6 space-x-2">
-                <button
-                  onClick={goToPreviousPage}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded-md flex items-center ${
-                    currentPage === 1
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      : "bg-green-100 text-foreground hover:bg-green-200"
-                  }`}
-                >
-                  <FaChevronLeft className="mr-1" />
-                  Prev
-                </button>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={cn(
+                  pageButton,
+                  "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                )}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Prev
+              </button>
 
-                <div className="flex space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
                     <button
                       key={page}
                       onClick={() => goToPage(page)}
-                      className={`px-3 py-1 rounded-md ${
+                      className={cn(
+                        pageButton,
                         currentPage === page
-                          ? "bg-green-500 text-white"
-                          : "bg-green-100 text-foreground hover:bg-green-200"
-                      }`}
+                          ? "border-transparent bg-accent text-accent-foreground"
+                          : "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                      )}
                     >
                       {page}
                     </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded-md flex items-center ${
-                    currentPage === totalPages
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      : "bg-green-100 text-foreground hover:bg-green-200"
-                  }`}
-                >
-                  Next
-                  <FaChevronRight className="ml-1" />
-                </button>
+                  )
+                )}
               </div>
-            )}
-          </>
-        )}
-      </div>
 
-      {/* Our Task Modal */}
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={cn(
+                  pageButton,
+                  "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                )}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Task modal */}
       <Task
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}

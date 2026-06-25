@@ -2,112 +2,128 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, X, User } from "lucide-react";
 import { logoutUser } from "@/lib/api/auth";
 import { useAuth } from "@/app/layouts/AuthProvider";
-import { useRouter } from "next/navigation";
+import ThemeToggle from "@/app/components/ThemeToggle";
+import { cn } from "@/lib/cn";
 
 const Header: React.FC = () => {
-    const { isLoggedIn, user, reloadUser } = useAuth();
+  const { isLoggedIn, user, reloadUser } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-    const router = useRouter();
-    const handleLogout = async () => {
-        try {
-            await logoutUser();
-            await reloadUser();
-            router.push("/home");
-        } catch (err) {
-            if (err instanceof Error) {
-                console.error("Login error:", err.message);
-            }
-        }
-    };
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      await reloadUser();
+      setIsMobileMenuOpen(false);
+      router.push("/");
+    } catch (err) {
+      if (err instanceof Error) {
+        console.error("Logout error:", err.message);
+      }
+    }
+  };
+
+  const navLink = (href: string, label: string, mobile = false) => {
+    const active = pathname === href;
     return (
-        <header className="bg-green-50 text-white p-4">
-            <div className="container mx-auto flex items-center justify-between">
-                <Link href="/" className="text-green-500 text-2xl font-bold">
-                    Task Manager
-                </Link>
-                <nav>
-                    <div className="relative flex items-center justify-between">
-                        {/* Mobile menu button - only visible on small screens */}
-                        <div className="sm:hidden">
-                            <button
-                                type="button"
-                                className="inline-flex items-center justify-center rounded-md p-2 text-green-500 hover:bg-green-100"
-                                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            >
-                                <svg className={`${isMobileMenuOpen ? 'hidden' : 'block'} w-6 h-6`} fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                                </svg>
-                                <svg className={`${isMobileMenuOpen ? 'block' : 'hidden'} w-6 h-6`} fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Desktop navigation */}
-                        <div className="hidden sm:ml-6 sm:flex">
-                            <div className="flex space-x-4">
-                                <Link href="/" className="rounded-md px-3 py-2 text-sm font-medium text-green-500 hover:bg-green-100">
-                                    Home
-                                </Link>
-                                {isLoggedIn && (
-                                    <Link href="/dashboard" className="rounded-md px-3 py-2 text-sm font-medium text-green-500 hover:bg-green-100">
-                                        Dashboard
-                                    </Link>
-                                )}
-                                {!isLoggedIn ? (
-                                    <Link href="/login" className="rounded-md px-3 py-2 text-sm font-medium text-green-500 hover:bg-green-100">
-                                        Login / Sign Up
-                                    </Link>
-                                ) : (
-                                    <div className="flex items-center">
-                                        <div className="relative ml-3 flex items-center">
-                                            <div className="flex rounded-full bg-green-100 p-1">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                </svg>
-                                            </div>
-                                            <span className="ml-2 text-green-500 text-sm font-medium">{user?.username}</span>
-                                            <button onClick={handleLogout} className="ml-4 rounded-md px-3 py-2 text-sm font-medium text-green-500 hover:bg-green-100">
-                                                Logout
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Mobile menu */}
-                    {isMobileMenuOpen && (
-                        <div className="sm:hidden">
-                            <div className="space-y-1 px-2 pt-2 pb-3">
-                                <Link href="/" className="block rounded-md px-3 py-2 text-base font-medium text-green-500 hover:bg-green-100">
-                                    Home
-                                </Link>
-                                {!isLoggedIn && (
-                                    <Link href="/dashboard" className="block rounded-md px-3 py-2 text-base font-medium text-green-500 hover:bg-green-100">
-                                        Dashboard
-                                    </Link>
-                                )}
-                                {!isLoggedIn ? (
-                                    <Link href="/login" className="block rounded-md px-3 py-2 text-base font-medium text-green-500 hover:bg-green-100">
-                                        Login / Sign Up
-                                    </Link>
-                                ) : (
-                                    <button onClick={handleLogout} className="block w-full text-left rounded-md px-3 py-2 text-base font-medium text-green-500 hover:bg-green-100">
-                                        Logout ({user?.username})
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </nav>
-            </div>
-        </header>
+      <Link
+        href={href}
+        onClick={() => setIsMobileMenuOpen(false)}
+        className={cn(
+          "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          mobile ? "block" : "",
+          active
+            ? "text-foreground bg-surface-muted"
+            : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+        )}
+      >
+        {label}
+      </Link>
     );
+  };
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-base font-semibold tracking-tight text-foreground"
+        >
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-accent-foreground text-xs font-bold">
+            T
+          </span>
+          Task Manager
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="hidden items-center gap-1 sm:flex">
+          {navLink("/", "Home")}
+          {isLoggedIn && navLink("/dashboard", "Dashboard")}
+          {!isLoggedIn ? (
+            navLink("/login", "Login / Sign Up")
+          ) : (
+            <div className="ml-2 flex items-center gap-2">
+              <span className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-sm text-foreground">
+                <User className="h-4 w-4 text-muted-foreground" />
+                {user?.username}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-surface-muted cursor-pointer"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+          <div className="ml-1">
+            <ThemeToggle />
+          </div>
+        </nav>
+
+        {/* Mobile controls */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            aria-label="Toggle menu"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-surface-muted cursor-pointer"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {isMobileMenuOpen && (
+        <div className="border-t border-border bg-background px-4 py-3 sm:hidden">
+          <div className="flex flex-col gap-1">
+            {navLink("/", "Home", true)}
+            {isLoggedIn && navLink("/dashboard", "Dashboard", true)}
+            {!isLoggedIn ? (
+              navLink("/login", "Login / Sign Up", true)
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="block w-full rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-surface-muted cursor-pointer"
+              >
+                Logout ({user?.username})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </header>
+  );
 };
 
 export default Header;
