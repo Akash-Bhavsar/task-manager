@@ -19,11 +19,11 @@ cd server
 cp .env.example .env          # set DATABASE_URL, JWT_SECRET
 npm ci
 npx prisma generate && npx prisma db push
-npm run dev                   # API on PORT (default 3000)
+npm run dev                   # API on PORT (default 4000)
 
 # client
 cd client
-cp .env.example .env.local    # set NEXT_PUBLIC_API_URL=http://localhost:3000
+cp .env.example .env.local    # set NEXT_PUBLIC_API_URL=http://localhost:4000
 npm ci
 npm run dev                   # http://localhost:3000
 ```
