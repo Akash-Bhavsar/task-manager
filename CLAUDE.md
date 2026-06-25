@@ -88,9 +88,12 @@ CI uses).
 - **CD:** platform-native, declared in `terraform/`. Pushing to `main` makes
   **Vercel** (client) and **Render** (server) rebuild and deploy automatically;
   **Neon** hosts Postgres. GitHub Actions does CI only — it does not deploy.
-  - `terraform/deploy.tf` defines the Vercel project + Render web service with
-    `auto_deploy` and the GitHub link; env vars (incl. `NEXT_PUBLIC_API_URL`,
-    `DATABASE_URL`, `JWT_SECRET`, `CLIENT_ORIGIN`) are wired there.
+  - `terraform/deploy.tf` manages the Vercel project (always) and the Render web
+    service (only when `manage_render = true`, i.e. a paid plan). On the free
+    tier (`manage_render = false`, default) Render is created manually — see
+    `terraform/README.md`. `NEXT_PUBLIC_API_URL` is set on Vercel via
+    `var.api_url`; `CLIENT_ORIGIN`/`CLIENT_ORIGIN_REGEX` are set on Render
+    (dashboard on free, Terraform on paid).
   - Setup + apply steps: `terraform/README.md`. Requires a one-time GitHub app
     install in the Vercel and Render dashboards, then `terraform apply` with
     `terraform.tfvars` (gitignored).

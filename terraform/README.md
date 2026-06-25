@@ -1,73 +1,91 @@
 # Infrastructure (Terraform)
 
-Provisions the deployment for task-manager:
+Provisions task-manager deploy. **Path A (free)** — Terraform manages Neon +
+Vercel; Render runs on its **free tier**, which the Render Terraform provider
+cannot manage, so the Render service is created manually (once).
 
-- **Neon** — Postgres (`neon.tf`)
-- **Vercel** — Next.js client, git-native auto-deploy (`deploy.tf`)
-- **Render** — Express API, native Node runtime, git-native auto-deploy (`deploy.tf`)
+| Component | Hosting | Managed by |
+|-----------|---------|------------|
+| Postgres  | Neon    | Terraform (`neon.tf`) |
+| Client    | Vercel  | Terraform (`deploy.tf`) |
+| API       | Render (free, Docker) | **Manual** (dashboard) |
 
-Pushing to the production branch (`main`) makes Vercel and Render rebuild and
-deploy automatically — that's the CD. Terraform just declares the projects, env
-vars, and the GitHub link reproducibly.
+Once provisioned, **deploys are automatic**: push to `main` → Vercel and Render
+rebuild. Terraform is only for provisioning/config.
 
-## One-time manual prerequisites
+## Why Render is manual
 
-Terraform can declare the projects, but the **GitHub ↔ platform connection is an
-OAuth/app install that must be done once in each dashboard first**:
+Render's Terraform provider rejects the free plan: `no such plan free for service
+type web`. Only `starter`+ work in Terraform. So free tier = dashboard. To put
+Render under Terraform later, set `manage_render = true` on a paid plan.
 
-1. **Vercel**: log in, install the Vercel GitHub app, and grant it access to the
-   `task-manager` repo. Create an API token (Account Settings → Tokens).
-2. **Render**: log in, connect your GitHub account, grant access to the repo.
-   Create an API key (Account Settings → API Keys) and note your **owner ID**
-   (team `tea-…` or user `usr-…`).
-3. **Neon**: create an API key (Account Settings → API Keys). The project already
-   exists in state.
+## One-time manual steps
+
+1. **GitHub app installs** (Terraform can't do the OAuth):
+   - Vercel: install the Vercel GitHub app, grant access to `task-manager`.
+   - Render: connect GitHub, grant access to `task-manager`.
+2. **API tokens**: Vercel API token; Neon API key.
+3. **Render service** (free, Docker) — create manually:
+   - Runtime: **Docker**, Root Directory: `server`, Dockerfile Path: `./Dockerfile`
+   - Branch: `main`, Auto-Deploy: On, Pre-Deploy Command: *empty*
+   - Env vars: `DATABASE_URL` (Neon pooler string), `JWT_SECRET`, `env_type=production`,
+     `CLIENT_ORIGIN` (comma list incl. the Vercel URL),
+     `CLIENT_ORIGIN_REGEX` (`^https://task-manager-[a-z0-9-]+\.vercel\.app$`)
+   - Don't set `PORT` (Render injects it).
+   - Note the resulting URL (e.g. `https://task-manager-n1hi.onrender.com`).
 
 ## Configure
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# fill in tokens/keys/owner id  (terraform.tfvars is gitignored)
+# fill in: neon_api_key, vercel_api_token, api_url (the Render URL from step 3)
+# leave manage_render = false
 ```
 
 ## Apply
 
 ```bash
-terraform init      # downloads providers for your OS (the old linux-only
-                    # .terraform/ cache is gitignored and can be deleted)
+terraform init
 terraform fmt
 terraform validate
 terraform plan
 terraform apply
 ```
 
-Outputs after apply:
+Outputs: `api_url`, `database_url` (sensitive), `render_service_url`
+(`(unmanaged …)` on Path A).
 
-- `client_url`  → `https://<vercel_project_name>.vercel.app`
-- `server_url`  → `https://<render_service_name>.onrender.com`
-- `database_url` (sensitive)
+## URL wiring (manual, because hosts get random suffixes)
 
-## How the two sides find each other
+The platforms append a random suffix to hostnames, so URLs can't be derived from
+names. Set them by hand:
 
-URLs are derived deterministically from the project/service **names**, so there's
-no dependency cycle:
+- Vercel `NEXT_PUBLIC_API_URL` = Render URL → `var.api_url` (Terraform sets it).
+- Render `CLIENT_ORIGIN` = Vercel URL → set in the Render dashboard.
 
-- Vercel gets `NEXT_PUBLIC_API_URL = https://<render_service_name>.onrender.com`
-- Render gets `CLIENT_ORIGIN = https://<vercel_project_name>.vercel.app` (used by
-  the API's CORS config)
+They must point at each other or auth/CORS breaks.
 
-⚠️ If a chosen name is already taken, the platform appends a suffix and the
-derived URL will be wrong. Keep names unique, or set the env var to the real URL
-after the first apply.
+## Going full IaC later (Path B)
 
-## Notes / future work
+Upgrade Render to `starter`, then in `terraform.tfvars`:
 
-- **State is local.** `terraform.tfstate` is gitignored (it contains secrets).
-  For team use or CI, move to a remote backend (Terraform Cloud, S3+DynamoDB,
-  etc.). Never commit state.
-- **Schema changes** are applied via `prisma db push` in Render's pre-deploy
-  command. For production you'll eventually want real Prisma migrations
-  (`prisma migrate deploy`) instead.
-- **Render free/starter** services spin down when idle (cold starts) and the
-  region (`singapore`) differs from Neon (`ap-southeast-2`), adding some DB
-  latency. Adjust `render_plan` / `render_region` as needed.
+```hcl
+manage_render       = true
+render_api_key      = "rnd_…"
+render_owner_id     = "tea-…"
+jwt_secret          = "…"
+client_origins      = "https://<vercel-url>"
+client_origin_regex = "^https://task-manager-[a-z0-9-]+\\.vercel\\.app$"
+```
+
+`terraform apply` then creates/manages the Render web service (native Node
+runtime). Verify `render_web_service.server.url` resolves on the first plan.
+
+## Notes
+
+- **State is local** and gitignored (contains secrets). For team/CI use a remote
+  backend (Terraform Cloud, S3+DynamoDB). Never commit state.
+- Schema syncs via `prisma db push` (container CMD). Move to Prisma migrations
+  (`migrate deploy`) for production.
+- Render free spins down when idle (cold start); region `singapore` ≠ Neon
+  `ap-southeast-2` adds some DB latency.
