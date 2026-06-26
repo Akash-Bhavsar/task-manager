@@ -39,6 +39,8 @@ interface TaskProps {
   initialTask?: TaskData;
   // Pre-selected status when creating (e.g. the Kanban column the "+" came from).
   defaultStatus?: string;
+  // Pre-filled due date when creating (e.g. the calendar day the "+" came from).
+  defaultDueDate?: string;
   // Called on create or edit submission
   onSubmit: (task: TaskData) => Promise<void>;
   // Called if user wants to delete the task
@@ -50,6 +52,7 @@ const Task: React.FC<TaskProps> = ({
   onClose,
   initialTask,
   defaultStatus,
+  defaultDueDate,
   onSubmit,
   onDelete,
 }) => {
@@ -60,13 +63,16 @@ const Task: React.FC<TaskProps> = ({
       ? normalizeStatus(defaultStatus)
       : DEFAULT_STATUS;
 
+  // Create pre-fills the due date from `defaultDueDate` (the calendar day clicked).
+  const initialDue = toDateInput(initialTask ? initialTask.dueDate : defaultDueDate);
+
   const [task, setTask] = useState<TaskData>({
     id: initialTask?.id,
     title: initialTask?.title || "",
     description: initialTask?.description || "",
     status: initialStatus,
     priority: initialTask?.priority || DEFAULT_PRIORITY,
-    dueDate: toDateInput(initialTask?.dueDate),
+    dueDate: initialDue,
   });
 
   useEffect(() => {
@@ -80,10 +86,10 @@ const Task: React.FC<TaskProps> = ({
       description: initialTask?.description || "",
       status: initialStatus,
       priority: initialTask?.priority || DEFAULT_PRIORITY,
-      dueDate: toDateInput(initialTask?.dueDate),
+      dueDate: initialDue,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTask, isOpen, defaultStatus]);
+  }, [initialTask, isOpen, defaultStatus, defaultDueDate]);
 
   // Toast / Error management
   const [toast, setToast] = useState<{

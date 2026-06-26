@@ -70,8 +70,10 @@ These block a correct Kanban/board and are addressed in Phase 0:
   Cross-cutting (needs DB enums).
 - View switcher (List / Board / Table), persisted in `localStorage`.
 
-### Phase 5 — Calendar, labels, bulk
-- **Calendar view** keyed off `dueDate`.
+### Phase 5 — Calendar, labels, bulk `[in progress]`
+- **Calendar view** keyed off `dueDate` `[done]` — month grid, prev/next/today,
+  tasks as day chips (priority dot, overdue/done styling), click chip to edit,
+  click a day to create with that date pre-filled (`Task` `defaultDueDate`).
 - **Labels/tags** (many-to-many) — colored chips + filter.
 - **Bulk actions**: multi-select → delete / move / set status.
 

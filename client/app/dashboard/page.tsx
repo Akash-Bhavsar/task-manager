@@ -15,10 +15,12 @@ import {
   List,
   LayoutGrid,
   Rows3,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
 import BoardView from "@/app/components/board/BoardView";
 import TableView from "@/app/components/table/TableView";
+import CalendarView from "@/app/components/calendar/CalendarView";
 import { useTasks } from "@/app/hooks/useTasks";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
@@ -73,22 +75,30 @@ export default function DashboardPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // List / Board / Table view, persisted across sessions. Defaults to the Kanban board.
-  const [view, setView] = useState<"list" | "board" | "table">("board");
+  // List / Board / Table / Calendar view, persisted across sessions. Defaults to Kanban.
+  const [view, setView] = useState<"list" | "board" | "table" | "calendar">(
+    "board"
+  );
   // Bumped after a global-Create/edit/delete so the board refetches too (it owns
   // its own data source, separate from the list's useTasks hook).
   const [boardReloadKey, setBoardReloadKey] = useState(0);
   useEffect(() => {
     const saved = localStorage.getItem("task-view");
-    if (saved === "board" || saved === "list" || saved === "table") setView(saved);
+    if (
+      saved === "board" ||
+      saved === "list" ||
+      saved === "table" ||
+      saved === "calendar"
+    )
+      setView(saved);
   }, []);
   useEffect(() => {
     localStorage.setItem("task-view", view);
   }, [view]);
-  // The table is denser than the list — give it more rows per page. Board owns
-  // its own fetch, so its page size is irrelevant here.
+  // The table is denser than the list — give it more rows per page. Board and
+  // calendar own their own fetch, so the hook's page size is irrelevant there.
   useEffect(() => {
-    if (view !== "board") setPageSize(view === "table" ? 10 : 5);
+    if (view === "list" || view === "table") setPageSize(view === "table" ? 10 : 5);
   }, [view, setPageSize]);
 
   // Auth errors from the fetch → bounce to login.
@@ -227,8 +237,15 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           {/* List / Board / Table view switcher */}
           <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
-            {(["list", "board", "table"] as const).map((v) => {
-              const Icon = v === "list" ? List : v === "board" ? LayoutGrid : Rows3;
+            {(["list", "board", "table", "calendar"] as const).map((v) => {
+              const Icon =
+                v === "list"
+                  ? List
+                  : v === "board"
+                    ? LayoutGrid
+                    : v === "table"
+                      ? Rows3
+                      : CalendarIcon;
               return (
                 <button
                   key={v}
@@ -257,6 +274,8 @@ export default function DashboardPage() {
 
       {view === "board" ? (
         <BoardView reloadSignal={boardReloadKey} />
+      ) : view === "calendar" ? (
+        <CalendarView reloadSignal={boardReloadKey} />
       ) : (
       <>
       {/* Filter / sort / search */}
