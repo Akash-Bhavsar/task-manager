@@ -41,7 +41,8 @@ export async function signupUser(username: string, password: string) {
     });
 
     if (!res.ok) {
-        throw new Error("Signup failed");
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Signup failed");
     }
     return res.json();
 }

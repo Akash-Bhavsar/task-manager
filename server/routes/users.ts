@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { authenticateToken } from '../middlewares/authenticateToken';
 import logger from '../utils/logger';
 import prisma from '../utils/prisma';
@@ -22,7 +22,13 @@ const authCookieOptions = {
 
 // REGISTER endpoint: Create a new user
 router.post('/register', async (req: Request, res: Response) => {
-  const { username, password, role } = req.body as { username: string; password: string; role: string; }; // replace with Prisam Role
+  const { username, password, role } = req.body as { username: string; password: string; role?: string; }; // replace with Prisam Role
+
+  if (!username || !password) {
+    res.status(400).json({ error: 'Username and password are required' });
+    return;
+  }
+
   try {
     logger.info(`Attempting to register user with username="${username}"`);
 
@@ -35,6 +41,12 @@ router.post('/register', async (req: Request, res: Response) => {
     logger.info(`Successfully registered user with id=${user.id}, username="${user.username}"`);
     res.status(201).json(user);
   } catch (err) {
+    // Unique constraint violation on `username` => the account already exists.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      logger.warn(`Registration rejected: username="${username}" already taken`);
+      res.status(409).json({ error: 'Username already taken' });
+      return;
+    }
     logger.error(`Registration failed for username="${username}": ${(err as Error).message}`, { error: err });
     res.status(500).json({ error: 'Registration failed' });
   }

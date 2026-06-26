@@ -1,85 +1,125 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createTask, updateTask, deleteTask } from "@/lib/api/tasks";
 import {
-  fetchTasks,
-  createTask,
-  updateTask,
-  deleteTask,
-} from "@/lib/api/tasks";
-import { FaEdit, FaTrash, FaTasks, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ListTodo,
+  CalendarClock,
+  List,
+  LayoutGrid,
+} from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
+import BoardView from "@/app/components/board/BoardView";
+import { useTasks } from "@/app/hooks/useTasks";
+import Button from "@/app/components/ui/Button";
+import Input from "@/app/components/ui/Input";
+import Select from "@/app/components/ui/Select";
+import Card from "@/app/components/ui/Card";
+import Badge, { statusToTone } from "@/app/components/ui/Badge";
+import IconButton from "@/app/components/ui/IconButton";
+import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
+import ErrorPopup, { ToastType } from "@/app/components/Errorpopup";
+import { cn } from "@/lib/cn";
+import {
+  TASK_STATUSES,
+  STATUS_LABELS,
+  PRIORITY_COLOR,
+  DEFAULT_PRIORITY,
+  statusLabel,
+  type TaskPriority,
+} from "@/lib/taskConstants";
+import { formatDueDate, isOverdue } from "@/lib/date";
+
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "updated", label: "Recently updated" },
+  { value: "created", label: "Recently created" },
+  { value: "due", label: "Due date" },
+  { value: "title", label: "Title A–Z" },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<TaskData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    items,
+    total,
+    page,
+    totalPages,
+    loading,
+    error,
+    status,
+    q,
+    sort,
+    setStatus,
+    setQ,
+    setSort,
+    setPage,
+    reload,
+  } = useTasks({ pageSize: 5 });
 
-  // Dropdown & filter/search UI state
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [filter, setFilter] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
-
-  // Modal states
+  // Modal + dialog state (UI only — data lives in the hook).
   const [modalOpen, setModalOpen] = useState(false);
-  const [currentTask, setCurrentTask] = useState<TaskData | undefined>(
-    undefined
-  );
+  const [currentTask, setCurrentTask] = useState<TaskData | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<TaskData | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  // Fetch tasks on mount
+  // List vs Board view, persisted across sessions. Defaults to the Kanban board.
+  const [view, setView] = useState<"list" | "board">("board");
+  // Bumped after a global-Create/edit/delete so the board refetches too (it owns
+  // its own data source, separate from the list's useTasks hook).
+  const [boardReloadKey, setBoardReloadKey] = useState(0);
   useEffect(() => {
-    const getTasks = async () => {
-      try {
-        const data = await fetchTasks();
-        setTasks(data);
-      } catch (err) {
-        if (err instanceof Error) {
-          // If 401/403, probably not authenticated => redirect to login
-          if (err.message.includes("401") || err.message.includes("403")) {
-            router.push("/login");
-            return;
-          }
-          setError(err.message);
-        } else {
-          setError("Unknown error occurred while fetching tasks.");
-        }
-      } finally {
-        setLoading(false);
+    const saved = localStorage.getItem("task-view");
+    if (saved === "board" || saved === "list") setView(saved);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("task-view", view);
+  }, [view]);
+
+  // Auth errors from the fetch → bounce to login.
+  useEffect(() => {
+    if (error && (error.includes("401") || error.includes("403"))) {
+      router.push("/login");
+    }
+  }, [error, router]);
+
+  // Keyboard shortcuts: c = create, / = focus search, esc = close overlays.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing =
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable);
+
+      if (e.key === "Escape") {
+        setModalOpen(false);
+        setDeleteTarget(null);
+        return;
+      }
+      if (typing) return;
+      if (e.key === "c") {
+        e.preventDefault();
+        setCurrentTask(undefined);
+        setModalOpen(true);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
       }
     };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-    getTasks();
-  }, [router]);
-
-  // Reset to first page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, searchTerm]);
-
-  // Handle pagination
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const goToPage = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-  };
-
-  // Rest of your handlers...
   const handleCreateTask = () => {
     setCurrentTask(undefined);
     setModalOpen(true);
@@ -90,323 +130,348 @@ export default function DashboardPage() {
     setModalOpen(true);
   };
 
-  const handleModalSubmit = async (newOrUpdatedTask: TaskData) => {
+  const handleModalSubmit = async (t: TaskData) => {
     try {
-      if (newOrUpdatedTask.id) {
-        const updatedFromServer = await updateTask(
-          String(newOrUpdatedTask.id),
-          {
-            title: newOrUpdatedTask.title,
-            description: newOrUpdatedTask.description,
-            status: newOrUpdatedTask.status,
-          }
-        );
-
-        setTasks((prev) =>
-          prev.map((t) => (t.id === updatedFromServer.id ? updatedFromServer : t))
-        );
-      } else {
-        const createdFromServer = await createTask({
-          title: newOrUpdatedTask.title,
-          description: newOrUpdatedTask.description,
-          status: newOrUpdatedTask.status,
+      if (t.id) {
+        await updateTask(String(t.id), {
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
         });
-
-        setTasks((prev) => [...prev, createdFromServer]);
+      } else {
+        await createTask({
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
+        });
       }
       setModalOpen(false);
+      await reload();
+      setBoardReloadKey((k) => k + 1);
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error occurred while saving task.");
-      }
+      setActionError(
+        err instanceof Error ? err.message : "Failed to save task."
+      );
     }
   };
 
   const handleModalDelete = async (taskId: number) => {
     try {
       await deleteTask(String(taskId));
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
       setModalOpen(false);
+      await reload();
+      setBoardReloadKey((k) => k + 1);
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error occurred while deleting task.");
-      }
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete task."
+      );
     }
   };
 
-  const handleInlineDelete = async (taskId: number) => {
+  const handleConfirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target?.id) return;
+    setDeleteTarget(null);
     try {
-      await deleteTask(String(taskId));
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      await deleteTask(String(target.id));
+      await reload();
+      setBoardReloadKey((k) => k + 1);
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error occurred while deleting task.");
-      }
+      setActionError(
+        err instanceof Error ? err.message : "Failed to delete task."
+      );
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-lightGreen p-4">
-        <h2 className="text-xl font-semibold text-foreground">
-          Loading tasks...
-        </h2>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-redish p-4">
-        <h2 className="text-xl font-semibold text-background">
-          Error loading tasks: {error}
-        </h2>
-        <button
-          onClick={() => router.push("/login")}
-          className="mt-4 bg-yellowish hover:bg-yellow-400 text-background py-2 px-4 rounded focus:outline-none transition"
-        >
-          Re-Login
-        </button>
-      </div>
-    );
-  }
-
-  // Filter + search
-  const filteredTasks = tasks.filter((task) => {
-    if (filter !== "all" && task.status !== filter) return false;
-    if (
-      searchTerm &&
-      !task.title.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-      return false;
-    return true;
-  });
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
-  const indexOfLastTask = currentPage * itemsPerPage;
-  const indexOfFirstTask = indexOfLastTask - itemsPerPage;
-  const currentTasks = filteredTasks.slice(indexOfFirstTask, indexOfLastTask);
+  const pageButton =
+    "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none";
 
   return (
-    <div className="min-h-screen bg-green-50 p-6">
-      <div className="max-w-3xl bg-green-25 mx-auto rounded-md shadow-md p-6">
-        {/* Top Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <FaTasks className="text-foreground" />
-              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            </div>
-            <button
-              onClick={handleCreateTask}
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-green-400 flex items-center gap-2"
-            >
-              <FaPlus />
-              Create Task
-            </button>
-          </div>
+    <div
+      className={cn(
+        "mx-auto w-full px-4 py-10 sm:px-6",
+        // Board uses the full screen; the list stays narrow for readability.
+        view === "board" ? "max-w-screen-2xl" : "max-w-3xl"
+      )}
+    >
+      {actionError && (
+        <ErrorPopup
+          message={actionError}
+          type={"danger" as ToastType}
+          onClose={() => setActionError(null)}
+          autoClose
+          duration={5000}
+        />
+      )}
 
-          {/* Filter & search */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowDropdown(!showDropdown)}
-                  className="shrink-0 z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-foreground bg-green-100 border border-yellowish rounded-lg hover:bg-green-200 focus:outline-none"
-                  type="button"
-                >
-                  Filter by: {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  <svg
-                    className="w-2.5 h-2.5 ms-2.5"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 10 6"
-                  >
-                    <path
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="m1 1 4 4 4-4"
-                    />
-                  </svg>
-                </button>
-                {showDropdown && (
-                  <div className="absolute z-10 mt-1 bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-44">
-                    <ul className="py-2 text-sm text-foreground">
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilter("all");
-                            setShowDropdown(false);
-                          }}
-                          className="inline-flex w-full px-4 py-2 hover:bg-green-100"
-                        >
-                          All
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilter("completed");
-                            setShowDropdown(false);
-                          }}
-                          className="inline-flex w-full px-4 py-2 hover:bg-green-100"
-                        >
-                          Completed
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFilter("in-progress");
-                            setShowDropdown(false);
-                          }}
-                          className="inline-flex w-full px-4 py-2 hover:bg-green-100"
-                        >
-                          In Progress
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Search bar */}
-              <div className="relative flex-grow">
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block p-2.5 w-full text-sm text-foreground bg-white rounded-lg border border-yellowish focus:ring-greenish focus:border-greenish"
-                  placeholder="Search tasks..."
-                />
-              </div>
-            </div>
-          </div>
+      {/* Top header */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <ListTodo className="h-5 w-5 text-muted-foreground" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Dashboard
+          </h1>
         </div>
-
-        {/* Task List */}
-        <h2 className="text-xl font-semibold text-foreground mb-4">My Tasks</h2>
-        {filteredTasks.length === 0 ? (
-          <div className="text-foreground">No tasks available.</div>
-        ) : (
-          <>
-            <ul className="space-y-3">
-              {currentTasks.map((task) => (
-                <li
-                  key={task.id}
-                  className="p-4 border border-yellowish rounded-lg shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-lg text-foreground">
-                      {task.title}
-                    </div>
-                    <span
-                      className={
-                        task.status === "completed"
-                          ? "text-greenish font-semibold ml-2"
-                          : "text-orange-500 font-semibold ml-2"
-                      }
-                    >
-                      {task.status.toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-foreground overflow-hidden">
-                    {task.description.length > 80
-                      ? task.description.slice(0, 80) + "..."
-                      : task.description}
-                  </p>
-
-                  {/* Edit & Delete buttons */}
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => handleEditTask(task)}
-                      className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
-                    >
-                      <FaEdit className="mr-2" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleInlineDelete(task.id!)}
-                      className="bg-redish hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none flex items-center"
-                    >
-                      <FaTrash className="mr-2" />
-                      Delete
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {/* Pagination controls */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center mt-6 space-x-2">
+        <div className="flex items-center gap-2">
+          {/* List / Board view switcher */}
+          <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
+            {(["list", "board"] as const).map((v) => {
+              const Icon = v === "list" ? List : LayoutGrid;
+              return (
                 <button
-                  onClick={goToPreviousPage}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded-md flex items-center ${
-                    currentPage === 1
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      : "bg-green-100 text-foreground hover:bg-green-200"
-                  }`}
+                  key={v}
+                  type="button"
+                  aria-label={`${v} view`}
+                  aria-pressed={view === v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors cursor-pointer",
+                    view === v
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                  )}
                 >
-                  <FaChevronLeft className="mr-1" />
-                  Prev
+                  <Icon className="h-4 w-4" />
                 </button>
-
-                <div className="flex space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={`px-3 py-1 rounded-md ${
-                        currentPage === page
-                          ? "bg-green-500 text-white"
-                          : "bg-green-100 text-foreground hover:bg-green-200"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded-md flex items-center ${
-                    currentPage === totalPages
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      : "bg-green-100 text-foreground hover:bg-green-200"
-                  }`}
-                >
-                  Next
-                  <FaChevronRight className="ml-1" />
-                </button>
-              </div>
-            )}
-          </>
-        )}
+              );
+            })}
+          </div>
+          <Button onClick={handleCreateTask}>
+            <Plus className="h-4 w-4" />
+            Create Task
+          </Button>
+        </div>
       </div>
 
-      {/* Our Task Modal */}
+      {view === "board" ? (
+        <BoardView reloadSignal={boardReloadKey} />
+      ) : (
+      <>
+      {/* Filter / sort / search */}
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="sm:w-40">
+          <Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            aria-label="Filter tasks by status"
+          >
+            <option value="all">All tasks</option>
+            {TASK_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="sm:w-48">
+          <Select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort tasks"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="relative flex-grow">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="pl-9"
+            placeholder="Search tasks…  ( / )"
+          />
+        </div>
+      </div>
+
+      {/* Task list */}
+      <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+        My Tasks
+        <span className="ml-2 text-muted-foreground/70">{total}</span>
+      </h2>
+
+      {loading ? (
+        <ul className="flex flex-col gap-2.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <li
+              key={i}
+              className="rounded-xl border border-border bg-surface p-4"
+            >
+              <div className="h-5 w-1/2 animate-pulse rounded bg-surface-muted" />
+              <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-surface-muted" />
+              <div className="mt-4 h-9 w-32 animate-pulse rounded-lg bg-surface-muted" />
+            </li>
+          ))}
+        </ul>
+      ) : error ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-danger">Couldn’t load tasks. {error}</p>
+          <Button variant="secondary" size="sm" onClick={() => reload()}>
+            Retry
+          </Button>
+        </Card>
+      ) : items.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            {status !== "all" || q ? "No tasks match your filters." : "No tasks yet."}
+          </p>
+          <Button variant="secondary" size="sm" onClick={handleCreateTask}>
+            <Plus className="h-4 w-4" />
+            Create your first task
+          </Button>
+        </Card>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-2.5">
+            {items.map((task) => {
+              const priority = PRIORITY_COLOR[task.priority as TaskPriority]
+                ? (task.priority as TaskPriority)
+                : DEFAULT_PRIORITY;
+              const overdue = isOverdue(task.dueDate, task.status);
+              return (
+                <li key={task.id}>
+                  <Card
+                    className="cursor-pointer border-l-[3px] p-4 transition-colors hover:border-border-strong"
+                    style={{ borderLeftColor: PRIORITY_COLOR[priority] }}
+                    onClick={() => handleEditTask(task)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-medium text-foreground">
+                        {task.title}
+                      </h3>
+                      <Badge tone={statusToTone(task.status)}>
+                        {statusLabel(task.status)}
+                      </Badge>
+                    </div>
+                    {task.description && (
+                      <p className="mt-1.5 text-sm text-muted-foreground">
+                        {task.description.length > 120
+                          ? task.description.slice(0, 120) + "…"
+                          : task.description}
+                      </p>
+                    )}
+
+                    {task.dueDate && (
+                      <p
+                        className={cn(
+                          "mt-2 flex items-center gap-1.5 text-xs",
+                          overdue ? "text-danger" : "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        {overdue ? "Overdue · " : "Due "}
+                        {formatDueDate(task.dueDate)}
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex gap-2">
+                      <IconButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditTask(task);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </IconButton>
+                      <IconButton
+                        variant="danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(task);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </IconButton>
+                    </div>
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className={cn(
+                  pageButton,
+                  "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                )}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Prev
+              </button>
+
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={cn(
+                      pageButton,
+                      p === page
+                        ? "border-transparent bg-accent text-accent-foreground"
+                        : "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages}
+                className={cn(
+                  pageButton,
+                  "border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                )}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      </>
+      )}
+
+      {/* Task modal */}
       <Task
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         initialTask={currentTask}
         onSubmit={handleModalSubmit}
         onDelete={handleModalDelete}
+      />
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete task?"
+        message={
+          deleteTarget
+            ? `"${deleteTarget.title}" will be permanently deleted.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        danger
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

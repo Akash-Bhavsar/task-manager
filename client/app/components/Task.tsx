@@ -1,13 +1,35 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import ErrorPopup, { ToastType } from "@/app/components/Errorpopup";
+import Input from "@/app/components/ui/Input";
+import Textarea from "@/app/components/ui/Textarea";
+import Select from "@/app/components/ui/Select";
+import Button from "@/app/components/ui/Button";
+import {
+  TASK_STATUSES,
+  TASK_PRIORITIES,
+  STATUS_LABELS,
+  PRIORITY_LABELS,
+  DEFAULT_STATUS,
+  DEFAULT_PRIORITY,
+  normalizeStatus,
+} from "@/lib/taskConstants";
 
 export interface TaskData {
   id?: number;
   title: string;
   description: string;
   status: string;
+  priority?: string;
+  dueDate?: string | null;
+}
+
+// HTML date input wants YYYY-MM-DD; tolerate ISO datetime from the API.
+function toDateInput(value?: string | null): string {
+  if (!value) return "";
+  return value.slice(0, 10);
 }
 
 interface TaskProps {
@@ -15,6 +37,8 @@ interface TaskProps {
   onClose: () => void;
   // If editing, we pass an existing task
   initialTask?: TaskData;
+  // Pre-selected status when creating (e.g. the Kanban column the "+" came from).
+  defaultStatus?: string;
   // Called on create or edit submission
   onSubmit: (task: TaskData) => Promise<void>;
   // Called if user wants to delete the task
@@ -25,25 +49,41 @@ const Task: React.FC<TaskProps> = ({
   isOpen,
   onClose,
   initialTask,
+  defaultStatus,
   onSubmit,
   onDelete,
 }) => {
+  // Create defaults to `defaultStatus` (the column its "+" came from), else draft.
+  const initialStatus = initialTask
+    ? normalizeStatus(initialTask.status)
+    : defaultStatus
+      ? normalizeStatus(defaultStatus)
+      : DEFAULT_STATUS;
+
   const [task, setTask] = useState<TaskData>({
     id: initialTask?.id,
     title: initialTask?.title || "",
     description: initialTask?.description || "",
-    status: initialTask?.status || "Draft",
+    status: initialStatus,
+    priority: initialTask?.priority || DEFAULT_PRIORITY,
+    dueDate: toDateInput(initialTask?.dueDate),
   });
 
   useEffect(() => {
-    // Update local state if the parent changes "initialTask"
+    // Re-initialize the form each time the modal opens (or the edited task
+    // changes). Keying on `isOpen` is what resets the form after a create —
+    // otherwise a second "Create" keeps the previous task's values.
+    if (!isOpen) return;
     setTask({
       id: initialTask?.id,
       title: initialTask?.title || "",
       description: initialTask?.description || "",
-      status: initialTask?.status || "Draft",
+      status: initialStatus,
+      priority: initialTask?.priority || DEFAULT_PRIORITY,
+      dueDate: toDateInput(initialTask?.dueDate),
     });
-  }, [initialTask]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTask, isOpen, defaultStatus]);
 
   // Toast / Error management
   const [toast, setToast] = useState<{
@@ -57,7 +97,9 @@ const Task: React.FC<TaskProps> = ({
 
   // Update local state on input changes
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
   ) => {
     const { name, value } = e.target;
     setTask((prev) => ({ ...prev, [name]: value }));
@@ -67,7 +109,6 @@ const Task: React.FC<TaskProps> = ({
   const handleDelete = async () => {
     if (task.id && onDelete) {
       try {
-        // Some parent might do an API call internally, so we await:
         await onDelete(task.id);
         setToast({ message: "Task deleted successfully", type: "success" });
         onClose();
@@ -86,7 +127,6 @@ const Task: React.FC<TaskProps> = ({
     e.preventDefault();
     try {
       await onSubmit(task);
-    //   setToast({ message: "Task saved successfully", type: "success" });
       onClose();
     } catch (err) {
       console.error(err);
@@ -101,7 +141,7 @@ const Task: React.FC<TaskProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed z-50 inset-0 overflow-y-auto bg-opacity-30 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-300 ease-out opacity-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/20 p-4 backdrop-blur-sm animate-fade-in">
       {/* If there's a toast message, show the ErrorPopup */}
       {toast.message && toast.type && (
         <ErrorPopup
@@ -114,108 +154,132 @@ const Task: React.FC<TaskProps> = ({
       )}
 
       {/* Modal container */}
-      <div className="bg-white rounded shadow-lg w-3/4 h-3/4 p-6 relative transition-transform duration-300 ease-out transform scale-95 animate-scaleIn">
+      <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-border bg-surface p-8 shadow-xl animate-scale-in">
         {/* Close button */}
         <button
           type="button"
-          className="absolute top-3 right-3 text-gray-500 hover:text-red-500 focus:outline-none"
+          aria-label="Close"
+          className="absolute right-4 top-4 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
           onClick={onClose}
         >
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="h-5 w-5" />
         </button>
 
         {/* Header */}
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="mb-5 text-lg font-semibold tracking-tight text-foreground">
           {initialTask ? "Edit Task" : "Create New Task"}
         </h2>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label
               htmlFor="taskTitle"
-              className="block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
               Title
             </label>
-            <input
+            <Input
               id="taskTitle"
               name="title"
               type="text"
               value={task.title}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded p-2 mt-1"
+              placeholder="What needs to be done?"
               required
             />
           </div>
 
-          {/* Description */}
-          {/* Could integrate something like Editor.js or a WYSIWYG if needed */}
           <div>
             <label
               htmlFor="taskDescription"
-              className="block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
               Description
             </label>
-            <textarea
+            <Textarea
               id="taskDescription"
               name="description"
               value={task.description}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded p-2 mt-1"
+              placeholder="Add more details…"
             />
           </div>
 
-          {/* Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="taskStatus"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Status
+              </label>
+              <Select
+                id="taskStatus"
+                name="status"
+                value={normalizeStatus(task.status)}
+                onChange={handleChange}
+              >
+                {TASK_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <label
+                htmlFor="taskPriority"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Priority
+              </label>
+              <Select
+                id="taskPriority"
+                name="priority"
+                value={task.priority || DEFAULT_PRIORITY}
+                onChange={handleChange}
+              >
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {PRIORITY_LABELS[p]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
           <div>
             <label
-              htmlFor="taskStatus"
-              className="block text-sm font-medium text-gray-700"
+              htmlFor="taskDueDate"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
-              Status
+              Due date
             </label>
-            <select
-              id="taskStatus"
-              name="status"
-              value={task.status}
+            <Input
+              id="taskDueDate"
+              name="dueDate"
+              type="date"
+              value={task.dueDate || ""}
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded p-2 mt-1"
-            >
-              <option value="Draft">Draft</option>
-              <option value="in-progress">In Progress</option>
-              <option value="completed">Completed</option>
-              {/* Add more statuses as needed */}
-            </select>
+            />
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center justify-end space-x-2 mt-4">
-            {/* Delete button if editing existing task */}
-            {task.id && onDelete && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600"
-              >
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {task.id && onDelete ? (
+              <Button type="button" variant="danger" onClick={handleDelete}>
                 Delete
-              </button>
+              </Button>
+            ) : (
+              <span />
             )}
-            <button
-              type="submit"
-              className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600"
-            >
-              {initialTask ? "Save" : "Create"}
-            </button>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit">{initialTask ? "Save" : "Create"}</Button>
+            </div>
           </div>
         </form>
       </div>
