@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTask, updateTask, deleteTask } from "@/lib/api/tasks";
+import { fetchLabels, type Label as LabelType } from "@/lib/api/labels";
 import {
   Plus,
   Pencil,
@@ -14,9 +15,13 @@ import {
   CalendarClock,
   List,
   LayoutGrid,
+  Rows3,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
 import BoardView from "@/app/components/board/BoardView";
+import TableView from "@/app/components/table/TableView";
+import CalendarView from "@/app/components/calendar/CalendarView";
 import { useTasks } from "@/app/hooks/useTasks";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
@@ -24,6 +29,7 @@ import Select from "@/app/components/ui/Select";
 import Card from "@/app/components/ui/Card";
 import Badge, { statusToTone } from "@/app/components/ui/Badge";
 import IconButton from "@/app/components/ui/IconButton";
+import LabelChips from "@/app/components/ui/LabelChips";
 import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
 import ErrorPopup, { ToastType } from "@/app/components/Errorpopup";
 import { cn } from "@/lib/cn";
@@ -56,12 +62,18 @@ export default function DashboardPage() {
     status,
     q,
     sort,
+    label,
     setStatus,
     setQ,
     setSort,
+    setLabel,
     setPage,
+    setPageSize,
     reload,
   } = useTasks({ pageSize: 5 });
+
+  // Labels for the filter dropdown (refetched alongside task reloads).
+  const [allLabels, setAllLabels] = useState<LabelType[]>([]);
 
   // Modal + dialog state (UI only — data lives in the hook).
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,18 +82,38 @@ export default function DashboardPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // List vs Board view, persisted across sessions. Defaults to the Kanban board.
-  const [view, setView] = useState<"list" | "board">("board");
+  // List / Board / Table / Calendar view, persisted across sessions. Defaults to Kanban.
+  const [view, setView] = useState<"list" | "board" | "table" | "calendar">(
+    "board"
+  );
   // Bumped after a global-Create/edit/delete so the board refetches too (it owns
   // its own data source, separate from the list's useTasks hook).
   const [boardReloadKey, setBoardReloadKey] = useState(0);
   useEffect(() => {
     const saved = localStorage.getItem("task-view");
-    if (saved === "board" || saved === "list") setView(saved);
+    if (
+      saved === "board" ||
+      saved === "list" ||
+      saved === "table" ||
+      saved === "calendar"
+    )
+      setView(saved);
   }, []);
   useEffect(() => {
     localStorage.setItem("task-view", view);
   }, [view]);
+  // Refetch labels whenever a create/edit/delete bumps the reload key (a new
+  // label may have been added from the modal).
+  useEffect(() => {
+    fetchLabels()
+      .then(setAllLabels)
+      .catch(() => setAllLabels([]));
+  }, [boardReloadKey]);
+  // The table is denser than the list — give it more rows per page. Board and
+  // calendar own their own fetch, so the hook's page size is irrelevant there.
+  useEffect(() => {
+    if (view === "list" || view === "table") setPageSize(view === "table" ? 10 : 5);
+  }, [view, setPageSize]);
 
   // Auth errors from the fetch → bounce to login.
   useEffect(() => {
@@ -139,6 +171,7 @@ export default function DashboardPage() {
           status: t.status,
           priority: t.priority,
           dueDate: t.dueDate,
+          labelIds: t.labelIds,
         });
       } else {
         await createTask({
@@ -147,6 +180,7 @@ export default function DashboardPage() {
           status: t.status,
           priority: t.priority,
           dueDate: t.dueDate,
+          labelIds: t.labelIds,
         });
       }
       setModalOpen(false);
@@ -194,8 +228,8 @@ export default function DashboardPage() {
     <div
       className={cn(
         "mx-auto w-full px-4 py-10 sm:px-6",
-        // Board uses the full screen; the list stays narrow for readability.
-        view === "board" ? "max-w-screen-2xl" : "max-w-3xl"
+        // Board and table use the full screen; the list stays narrow for readability.
+        view === "list" ? "max-w-3xl" : "max-w-screen-2xl"
       )}
     >
       {actionError && (
@@ -217,10 +251,17 @@ export default function DashboardPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* List / Board view switcher */}
+          {/* List / Board / Table view switcher */}
           <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
-            {(["list", "board"] as const).map((v) => {
-              const Icon = v === "list" ? List : LayoutGrid;
+            {(["list", "board", "table", "calendar"] as const).map((v) => {
+              const Icon =
+                v === "list"
+                  ? List
+                  : v === "board"
+                    ? LayoutGrid
+                    : v === "table"
+                      ? Rows3
+                      : CalendarIcon;
               return (
                 <button
                   key={v}
@@ -249,6 +290,8 @@ export default function DashboardPage() {
 
       {view === "board" ? (
         <BoardView reloadSignal={boardReloadKey} />
+      ) : view === "calendar" ? (
+        <CalendarView reloadSignal={boardReloadKey} />
       ) : (
       <>
       {/* Filter / sort / search */}
@@ -280,6 +323,24 @@ export default function DashboardPage() {
             ))}
           </Select>
         </div>
+        {allLabels.length > 0 && (
+          <div className="sm:w-44">
+            <Select
+              value={label ?? ""}
+              onChange={(e) =>
+                setLabel(e.target.value ? Number(e.target.value) : null)
+              }
+              aria-label="Filter tasks by label"
+            >
+              <option value="">All labels</option>
+              {allLabels.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div className="relative flex-grow">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -299,7 +360,37 @@ export default function DashboardPage() {
         <span className="ml-2 text-muted-foreground/70">{total}</span>
       </h2>
 
-      {loading ? (
+      {error ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-danger">Couldn’t load tasks. {error}</p>
+          <Button variant="secondary" size="sm" onClick={() => reload()}>
+            Retry
+          </Button>
+        </Card>
+      ) : !loading && items.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            {status !== "all" || q ? "No tasks match your filters." : "No tasks yet."}
+          </p>
+          <Button variant="secondary" size="sm" onClick={handleCreateTask}>
+            <Plus className="h-4 w-4" />
+            Create your first task
+          </Button>
+        </Card>
+      ) : view === "table" ? (
+        <TableView
+          items={items}
+          sort={sort}
+          onSort={setSort}
+          onEditTask={handleEditTask}
+          onDeleteTask={(t) => setDeleteTarget(t)}
+          loading={loading}
+          onBulkComplete={async () => {
+            await reload();
+            setBoardReloadKey((k) => k + 1);
+          }}
+        />
+      ) : loading ? (
         <ul className="flex flex-col gap-2.5">
           {Array.from({ length: 5 }).map((_, i) => (
             <li
@@ -312,25 +403,7 @@ export default function DashboardPage() {
             </li>
           ))}
         </ul>
-      ) : error ? (
-        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-sm text-danger">Couldn’t load tasks. {error}</p>
-          <Button variant="secondary" size="sm" onClick={() => reload()}>
-            Retry
-          </Button>
-        </Card>
-      ) : items.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-sm text-muted-foreground">
-            {status !== "all" || q ? "No tasks match your filters." : "No tasks yet."}
-          </p>
-          <Button variant="secondary" size="sm" onClick={handleCreateTask}>
-            <Plus className="h-4 w-4" />
-            Create your first task
-          </Button>
-        </Card>
       ) : (
-        <>
           <ul className="flex flex-col gap-2.5">
             {items.map((task) => {
               const priority = PRIORITY_COLOR[task.priority as TaskPriority]
@@ -373,6 +446,8 @@ export default function DashboardPage() {
                       </p>
                     )}
 
+                    <LabelChips labels={task.labels} className="mt-2.5" />
+
                     <div className="mt-4 flex gap-2">
                       <IconButton
                         onClick={(e) => {
@@ -399,10 +474,11 @@ export default function DashboardPage() {
               );
             })}
           </ul>
+      )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
+      {/* Pagination — shared by list & table */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
@@ -445,8 +521,6 @@ export default function DashboardPage() {
               </button>
             </div>
           )}
-        </>
-      )}
       </>
       )}
 

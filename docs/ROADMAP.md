@@ -64,14 +64,25 @@ These block a correct Kanban/board and are addressed in Phase 0:
   (midpoint between neighbors), not the whole column.
 - Per-column task counts.
 
-### Phase 4 — More views + switcher
-- **Table view**: sortable dense columns (needs Phase 2 sort).
+### Phase 4 — More views + switcher `[done]`
+- **Table view**: sortable dense columns (Title / Due / Updated headers; reuses
+  Phase 2 server sort). Priority/status column sorting deferred — see
+  Cross-cutting (needs DB enums).
 - View switcher (List / Board / Table), persisted in `localStorage`.
 
-### Phase 5 — Calendar, labels, bulk
-- **Calendar view** keyed off `dueDate`.
-- **Labels/tags** (many-to-many) — colored chips + filter.
-- **Bulk actions**: multi-select → delete / move / set status.
+### Phase 5 — Calendar, labels, bulk `[done]`
+- **Calendar view** keyed off `dueDate` `[done]` — month grid, prev/next/today,
+  tasks as day chips (priority dot, overdue/done styling), click chip to edit,
+  click a day to create with that date pre-filled (`Task` `defaultDueDate`).
+- **Labels/tags** (many-to-many) `[done]` — `Label` model (user-scoped,
+  implicit `_LabelToTask` join), `/api/labels` CRUD, tasks embed `labels` and
+  accept `labelIds` on create/update; client label picker in the task modal
+  (toggle + inline create), colored chips on list/board/table cards, and a
+  label filter on list/table (`?label=`).
+- **Bulk actions** `[done]` — multi-select rows in the Table view; a toolbar to
+  set status (move between statuses) or delete the selection. Server batch
+  endpoints `POST /api/tasks/bulk` (status, owner-scoped) and
+  `POST /api/tasks/bulk-delete` (ADMIN-only, mirroring single delete).
 
 ---
 

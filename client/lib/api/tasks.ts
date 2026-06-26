@@ -1,9 +1,12 @@
+import { Label } from "./labels";
+
 export interface TasksQuery {
   status?: string;
   q?: string;
   sort?: string;
   page?: number;
   pageSize?: number;
+  label?: number;
 }
 
 export interface TaskRecord {
@@ -16,6 +19,7 @@ export interface TaskRecord {
   position?: number;
   createdAt?: string;
   updatedAt?: string;
+  labels?: Label[];
 }
 
 export interface TasksPage {
@@ -31,6 +35,7 @@ export async function fetchTasks(params: TasksQuery = {}): Promise<TasksPage> {
   if (params.status && params.status !== "all") sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
   if (params.sort) sp.set("sort", params.sort);
+  if (params.label) sp.set("label", String(params.label));
   sp.set("page", String(params.page ?? 1));
   sp.set("pageSize", String(params.pageSize ?? 10));
 
@@ -70,6 +75,7 @@ export interface TaskData {
   priority?: string;
   dueDate?: string | null;
   position?: number;
+  labelIds?: number[];
 }
 
 export async function createTask(taskData: TaskData) {
@@ -104,6 +110,39 @@ export async function updateTask(taskId: string, updatedData: Partial<TaskData>)
   }
 
   return response.json();
+}
+
+// Set the same status on many tasks at once. Returns the number updated.
+export async function bulkUpdateStatus(
+  ids: number[],
+  status: string
+): Promise<{ count: number }> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/bulk`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, status }),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => null);
+    throw new Error(msg?.error ?? `Failed to update tasks: ${res.status}`);
+  }
+  return res.json();
+}
+
+// Delete many tasks at once (ADMIN-only on the server). Returns the count deleted.
+export async function bulkDeleteTasks(ids: number[]): Promise<{ count: number }> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/bulk-delete`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => null);
+    throw new Error(msg?.error ?? `Failed to delete tasks: ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function deleteTask(taskId: string) {

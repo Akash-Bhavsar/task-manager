@@ -6,6 +6,7 @@ import { Pencil, Trash2, CalendarClock, GripVertical } from "lucide-react";
 import Card from "@/app/components/ui/Card";
 import Badge, { statusToTone } from "@/app/components/ui/Badge";
 import IconButton from "@/app/components/ui/IconButton";
+import LabelChips from "@/app/components/ui/LabelChips";
 import { TaskRecord } from "@/lib/api/tasks";
 import {
   PRIORITY_COLOR,
@@ -74,6 +75,8 @@ export function TaskCardContent({
           {formatDueDate(task.dueDate)}
         </p>
       )}
+
+      <LabelChips labels={task.labels} className="mt-2" />
 
       {!overlay && (
         <div className="mt-3 flex gap-2">
