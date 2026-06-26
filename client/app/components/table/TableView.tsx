@@ -13,6 +13,7 @@ import {
 import { formatDueDate, isOverdue } from "@/lib/date";
 import Badge, { statusToTone } from "@/app/components/ui/Badge";
 import IconButton from "@/app/components/ui/IconButton";
+import LabelChips from "@/app/components/ui/LabelChips";
 
 interface TableViewProps {
   items: TaskRecord[];
@@ -111,6 +112,7 @@ export default function TableView({
                         />
                         {task.title}
                       </span>
+                      <LabelChips labels={task.labels} className="mt-1.5 pl-[1.125rem]" />
                     </td>
                     <td className={td}>
                       <Badge tone={statusToTone(task.status)}>

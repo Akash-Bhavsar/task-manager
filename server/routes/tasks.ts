@@ -37,6 +37,25 @@ function parseDueDate(value: unknown): Date | null | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+// Normalize an incoming labelIds payload to a unique number[]; undefined when
+// the field wasn't supplied (so updates can leave labels untouched).
+function parseLabelIds(value: unknown): number[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+  const ids = value.map((v) => parseInt(String(v), 10)).filter((n) => !isNaN(n));
+  return [...new Set(ids)];
+}
+
+// Guard against attaching labels that aren't the user's own.
+async function ownsAllLabels(userId: number, ids: number[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const count = await prisma.label.count({ where: { id: { in: ids }, userId } });
+  return count === ids.length;
+}
+
+// Every task response embeds its labels so the client can render chips.
+const withLabels = { labels: true } as const;
+
 // GET tasks for the authenticated user
 router.get('/my-tasks', authenticateToken, async (req: Request, res: Response) => {
   try {
@@ -46,6 +65,7 @@ router.get('/my-tasks', authenticateToken, async (req: Request, res: Response) =
 
     const tasks = await prisma.task.findMany({
       where: { userId },
+      include: withLabels,
     });
 
     logger.info(`Successfully fetched ${tasks.length} tasks for userId=${userId}`);
@@ -67,6 +87,8 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 
     const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const labelId =
+      req.query.label !== undefined ? parseInt(String(req.query.label), 10) : NaN;
     const sort = typeof req.query.sort === 'string' ? req.query.sort : 'updated';
     const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
     const pageSize = Math.min(
@@ -82,6 +104,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
       ...(isAdmin ? {} : { userId: user.id }),
       ...(normStatus ? { status: normStatus } : {}),
       ...(q ? { title: { contains: q, mode: 'insensitive' } } : {}),
+      ...(Number.isNaN(labelId) ? {} : { labels: { some: { id: labelId } } }),
     };
 
     const [total, items] = await Promise.all([
@@ -91,6 +114,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
         orderBy: sortToOrderBy(sort),
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: withLabels,
       }),
     ]);
 
@@ -128,6 +152,7 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response): Promi
 
     const task = await prisma.task.findFirst({
       where: { id, ...(isAdmin ? {} : { userId: user.id }) },
+      include: withLabels,
     });
 
     if (!task) {
@@ -144,12 +169,13 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response): Promi
 
 // POST /tasks - Create a new task
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
-  const { title, description, status, priority, dueDate } = req.body as {
+  const { title, description, status, priority, dueDate, labelIds } = req.body as {
     title: string;
     description?: string;
     status?: string;
     priority?: string;
     dueDate?: string | null;
+    labelIds?: number[];
   };
 
   if (!title || !title.trim()) {
@@ -168,9 +194,16 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     return;
   }
   const due = parseDueDate(dueDate);
+  const ids = parseLabelIds(labelIds);
 
   try {
     const user = req.user!;
+
+    if (ids && !(await ownsAllLabels(user.id, ids))) {
+      res.status(400).json({ error: 'Invalid labelIds' });
+      return;
+    }
+
     logger.info(`POST /tasks called by userId=${user.id} to create task: title="${title}"`);
 
     const task = await prisma.task.create({
@@ -181,7 +214,11 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
         priority: normPriority,
         dueDate: due ?? null,
         userId: user.id,
+        ...(ids && ids.length
+          ? { labels: { connect: ids.map((id) => ({ id })) } }
+          : {}),
       },
+      include: withLabels,
     });
 
     logger.info(`Task (id=${task.id}) created successfully by userId=${user.id}`);
@@ -195,14 +232,17 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 // PUT /tasks/:id - Update an existing task
 router.put('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   const id = String(req.params.id);
-  const { title, description, status, priority, dueDate, position } = req.body as {
-    title?: string;
-    description?: string;
-    status?: string;
-    priority?: string;
-    dueDate?: string | null;
-    position?: number;
-  };
+  const { title, description, status, priority, dueDate, position, labelIds } =
+    req.body as {
+      title?: string;
+      description?: string;
+      status?: string;
+      priority?: string;
+      dueDate?: string | null;
+      position?: number;
+      labelIds?: number[];
+    };
+  const ids = parseLabelIds(labelIds);
 
   // Build a partial update — only touch fields that were supplied.
   const data: {
@@ -244,9 +284,15 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
 
   try {
     const user = req.user!;
+
+    if (ids && !(await ownsAllLabels(user.id, ids))) {
+      res.status(400).json({ error: 'Invalid labelIds' });
+      return;
+    }
+
     logger.info(`PUT /tasks/${id} by userId=${user.id} with data={title:${title}, status:${status}}`);
 
-    // updateMany returns the count of updated records
+    // updateMany returns the count of updated records (and scopes to the owner).
     const result = await prisma.task.updateMany({
       where: { id: parseInt(id), userId: user.id },
       data,
@@ -258,9 +304,19 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
       return;
     }
 
+    // Relation writes can't go through updateMany — set labels in a second,
+    // now-authorized write when the field was supplied.
+    if (ids !== undefined) {
+      await prisma.task.update({
+        where: { id: parseInt(id) },
+        data: { labels: { set: ids.map((labelId) => ({ id: labelId })) } },
+      });
+    }
+
     // We can fetch the updated task to return it
     const updatedTask = await prisma.task.findUnique({
       where: { id: parseInt(id) },
+      include: withLabels,
     });
 
     logger.info(`Task (id=${id}) updated successfully by userId=${user.id}`);

@@ -4,6 +4,7 @@ import logger from './utils/logger';
 import dotenv from 'dotenv';
 import userRoutes from './routes/users';
 import taskRoutes from './routes/tasks';
+import labelRoutes from './routes/labels';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 
@@ -56,6 +57,7 @@ app.use(
 );
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/labels', labelRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   logger.info('Handling GET / request'); // Winston app-level log

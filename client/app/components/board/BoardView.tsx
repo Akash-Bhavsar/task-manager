@@ -200,6 +200,7 @@ export default function BoardView({ reloadSignal }: { reloadSignal?: number }) {
       status: task.status,
       priority: task.priority,
       dueDate: task.dueDate,
+      labels: task.labels,
     });
     setModalOpen(true);
   };
@@ -213,6 +214,7 @@ export default function BoardView({ reloadSignal }: { reloadSignal?: number }) {
           status: t.status,
           priority: t.priority,
           dueDate: t.dueDate,
+          labelIds: t.labelIds,
         });
       } else {
         await createTask({
@@ -221,6 +223,7 @@ export default function BoardView({ reloadSignal }: { reloadSignal?: number }) {
           status: t.status,
           priority: t.priority,
           dueDate: t.dueDate,
+          labelIds: t.labelIds,
         });
       }
       setModalOpen(false);

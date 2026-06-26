@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createTask, updateTask, deleteTask } from "@/lib/api/tasks";
+import { fetchLabels, type Label as LabelType } from "@/lib/api/labels";
 import {
   Plus,
   Pencil,
@@ -28,6 +29,7 @@ import Select from "@/app/components/ui/Select";
 import Card from "@/app/components/ui/Card";
 import Badge, { statusToTone } from "@/app/components/ui/Badge";
 import IconButton from "@/app/components/ui/IconButton";
+import LabelChips from "@/app/components/ui/LabelChips";
 import ConfirmDialog from "@/app/components/ui/ConfirmDialog";
 import ErrorPopup, { ToastType } from "@/app/components/Errorpopup";
 import { cn } from "@/lib/cn";
@@ -60,13 +62,18 @@ export default function DashboardPage() {
     status,
     q,
     sort,
+    label,
     setStatus,
     setQ,
     setSort,
+    setLabel,
     setPage,
     setPageSize,
     reload,
   } = useTasks({ pageSize: 5 });
+
+  // Labels for the filter dropdown (refetched alongside task reloads).
+  const [allLabels, setAllLabels] = useState<LabelType[]>([]);
 
   // Modal + dialog state (UI only — data lives in the hook).
   const [modalOpen, setModalOpen] = useState(false);
@@ -95,6 +102,13 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem("task-view", view);
   }, [view]);
+  // Refetch labels whenever a create/edit/delete bumps the reload key (a new
+  // label may have been added from the modal).
+  useEffect(() => {
+    fetchLabels()
+      .then(setAllLabels)
+      .catch(() => setAllLabels([]));
+  }, [boardReloadKey]);
   // The table is denser than the list — give it more rows per page. Board and
   // calendar own their own fetch, so the hook's page size is irrelevant there.
   useEffect(() => {
@@ -157,6 +171,7 @@ export default function DashboardPage() {
           status: t.status,
           priority: t.priority,
           dueDate: t.dueDate,
+          labelIds: t.labelIds,
         });
       } else {
         await createTask({
@@ -165,6 +180,7 @@ export default function DashboardPage() {
           status: t.status,
           priority: t.priority,
           dueDate: t.dueDate,
+          labelIds: t.labelIds,
         });
       }
       setModalOpen(false);
@@ -307,6 +323,24 @@ export default function DashboardPage() {
             ))}
           </Select>
         </div>
+        {allLabels.length > 0 && (
+          <div className="sm:w-44">
+            <Select
+              value={label ?? ""}
+              onChange={(e) =>
+                setLabel(e.target.value ? Number(e.target.value) : null)
+              }
+              aria-label="Filter tasks by label"
+            >
+              <option value="">All labels</option>
+              {allLabels.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div className="relative flex-grow">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -407,6 +441,8 @@ export default function DashboardPage() {
                         {formatDueDate(task.dueDate)}
                       </p>
                     )}
+
+                    <LabelChips labels={task.labels} className="mt-2.5" />
 
                     <div className="mt-4 flex gap-2">
                       <IconButton

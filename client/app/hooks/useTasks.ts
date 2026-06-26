@@ -14,9 +14,11 @@ export interface UseTasks {
   status: string;
   q: string;
   sort: string;
+  label: number | null;
   setStatus: (s: string) => void;
   setQ: (q: string) => void;
   setSort: (s: string) => void;
+  setLabel: (id: number | null) => void;
   setPage: (p: number) => void;
   setPageSize: (n: number) => void;
   reload: () => Promise<void>;
@@ -30,6 +32,7 @@ export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
   const [status, setStatus] = useState(initial?.status ?? "all");
   const [q, setQ] = useState(initial?.q ?? "");
   const [sort, setSort] = useState(initial?.sort ?? "updated");
+  const [label, setLabel] = useState<number | null>(initial?.label ?? null);
   const [page, setPage] = useState(initial?.page ?? 1);
 
   const [items, setItems] = useState<TaskRecord[]>([]);
@@ -48,13 +51,20 @@ export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
   // Any filter/search/sort change resets to the first page.
   useEffect(() => {
     setPage(1);
-  }, [status, sort, debouncedQ, pageSize]);
+  }, [status, sort, debouncedQ, pageSize, label]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchTasks({ status, q: debouncedQ, sort, page, pageSize });
+      const res = await fetchTasks({
+        status,
+        q: debouncedQ,
+        sort,
+        page,
+        pageSize,
+        label: label ?? undefined,
+      });
       setItems(res.items);
       setTotal(res.total);
       setTotalPages(res.totalPages);
@@ -63,7 +73,7 @@ export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
     } finally {
       setLoading(false);
     }
-  }, [status, debouncedQ, sort, page, pageSize]);
+  }, [status, debouncedQ, sort, page, pageSize, label]);
 
   useEffect(() => {
     load();
@@ -80,9 +90,11 @@ export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
     status,
     q,
     sort,
+    label,
     setStatus,
     setQ,
     setSort,
+    setLabel,
     setPage,
     setPageSize,
     reload: load,

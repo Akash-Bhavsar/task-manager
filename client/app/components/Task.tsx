@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Plus, Check } from "lucide-react";
 import ErrorPopup, { ToastType } from "@/app/components/Errorpopup";
 import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
 import Select from "@/app/components/ui/Select";
 import Button from "@/app/components/ui/Button";
+import { cn } from "@/lib/cn";
+import { Label, fetchLabels, createLabel } from "@/lib/api/labels";
 import {
   TASK_STATUSES,
   TASK_PRIORITIES,
@@ -17,6 +19,17 @@ import {
   normalizeStatus,
 } from "@/lib/taskConstants";
 
+// Preset palette offered when creating a new label.
+const LABEL_COLORS = [
+  "#64748b",
+  "#ef4444",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+];
+
 export interface TaskData {
   id?: number;
   title: string;
@@ -24,6 +37,10 @@ export interface TaskData {
   status: string;
   priority?: string;
   dueDate?: string | null;
+  // Present when editing — used to seed the selected label chips.
+  labels?: Label[];
+  // Submitted selection.
+  labelIds?: number[];
 }
 
 // HTML date input wants YYYY-MM-DD; tolerate ISO datetime from the API.
@@ -91,6 +108,49 @@ const Task: React.FC<TaskProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTask, isOpen, defaultStatus, defaultDueDate]);
 
+  // Labels: all of the user's labels, plus the currently-selected ids.
+  const [allLabels, setAllLabels] = useState<Label[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0]);
+  const [creatingLabel, setCreatingLabel] = useState(false);
+
+  // On open: load the user's labels and seed the selection from the task.
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedIds(initialTask?.labels?.map((l) => l.id) ?? []);
+    setNewLabelName("");
+    fetchLabels()
+      .then(setAllLabels)
+      .catch(() => setAllLabels([]));
+  }, [isOpen, initialTask]);
+
+  const toggleLabel = (id: number) =>
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
+  const handleCreateLabel = async () => {
+    const name = newLabelName.trim();
+    if (!name || creatingLabel) return;
+    setCreatingLabel(true);
+    try {
+      const label = await createLabel(name, newLabelColor);
+      setAllLabels((prev) =>
+        [...prev, label].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setSelectedIds((prev) => [...prev, label.id]);
+      setNewLabelName("");
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : "Failed to create label",
+        type: "danger",
+      });
+    } finally {
+      setCreatingLabel(false);
+    }
+  };
+
   // Toast / Error management
   const [toast, setToast] = useState<{
     message: string;
@@ -132,7 +192,7 @@ const Task: React.FC<TaskProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await onSubmit(task);
+      await onSubmit({ ...task, labelIds: selectedIds });
       onClose();
     } catch (err) {
       console.error(err);
@@ -269,6 +329,93 @@ const Task: React.FC<TaskProps> = ({
               value={task.dueDate || ""}
               onChange={handleChange}
             />
+          </div>
+
+          {/* Labels */}
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-foreground">
+              Labels
+            </span>
+            {allLabels.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {allLabels.map((label) => {
+                  const on = selectedIds.includes(label.id);
+                  return (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => toggleLabel(label.id)}
+                      aria-pressed={on}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+                        on
+                          ? "text-foreground"
+                          : "border-border text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                      )}
+                      style={
+                        on
+                          ? {
+                              color: label.color,
+                              borderColor: `${label.color}66`,
+                              backgroundColor: `${label.color}1a`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: label.color }}
+                        aria-hidden
+                      />
+                      {label.name}
+                      {on && <Check className="h-3 w-3" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Create a new label inline */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {LABEL_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`Use color ${c}`}
+                    onClick={() => setNewLabelColor(c)}
+                    className={cn(
+                      "h-5 w-5 rounded-full border transition-transform cursor-pointer",
+                      newLabelColor === c
+                        ? "scale-110 border-foreground"
+                        : "border-transparent"
+                    )}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+              <Input
+                value={newLabelName}
+                onChange={(e) => setNewLabelName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateLabel();
+                  }
+                }}
+                placeholder="New label…"
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCreateLabel}
+                disabled={!newLabelName.trim() || creatingLabel}
+              >
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
+            </div>
           </div>
 
           {/* Action buttons */}
