@@ -64,8 +64,10 @@ These block a correct Kanban/board and are addressed in Phase 0:
   (midpoint between neighbors), not the whole column.
 - Per-column task counts.
 
-### Phase 4 — More views + switcher
-- **Table view**: sortable dense columns (needs Phase 2 sort).
+### Phase 4 — More views + switcher `[done]`
+- **Table view**: sortable dense columns (Title / Due / Updated headers; reuses
+  Phase 2 server sort). Priority/status column sorting deferred — see
+  Cross-cutting (needs DB enums).
 - View switcher (List / Board / Table), persisted in `localStorage`.
 
 ### Phase 5 — Calendar, labels, bulk

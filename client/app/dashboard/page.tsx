@@ -14,9 +14,11 @@ import {
   CalendarClock,
   List,
   LayoutGrid,
+  Rows3,
 } from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
 import BoardView from "@/app/components/board/BoardView";
+import TableView from "@/app/components/table/TableView";
 import { useTasks } from "@/app/hooks/useTasks";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
@@ -60,6 +62,7 @@ export default function DashboardPage() {
     setQ,
     setSort,
     setPage,
+    setPageSize,
     reload,
   } = useTasks({ pageSize: 5 });
 
@@ -70,18 +73,23 @@ export default function DashboardPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // List vs Board view, persisted across sessions. Defaults to the Kanban board.
-  const [view, setView] = useState<"list" | "board">("board");
+  // List / Board / Table view, persisted across sessions. Defaults to the Kanban board.
+  const [view, setView] = useState<"list" | "board" | "table">("board");
   // Bumped after a global-Create/edit/delete so the board refetches too (it owns
   // its own data source, separate from the list's useTasks hook).
   const [boardReloadKey, setBoardReloadKey] = useState(0);
   useEffect(() => {
     const saved = localStorage.getItem("task-view");
-    if (saved === "board" || saved === "list") setView(saved);
+    if (saved === "board" || saved === "list" || saved === "table") setView(saved);
   }, []);
   useEffect(() => {
     localStorage.setItem("task-view", view);
   }, [view]);
+  // The table is denser than the list — give it more rows per page. Board owns
+  // its own fetch, so its page size is irrelevant here.
+  useEffect(() => {
+    if (view !== "board") setPageSize(view === "table" ? 10 : 5);
+  }, [view, setPageSize]);
 
   // Auth errors from the fetch → bounce to login.
   useEffect(() => {
@@ -194,8 +202,8 @@ export default function DashboardPage() {
     <div
       className={cn(
         "mx-auto w-full px-4 py-10 sm:px-6",
-        // Board uses the full screen; the list stays narrow for readability.
-        view === "board" ? "max-w-screen-2xl" : "max-w-3xl"
+        // Board and table use the full screen; the list stays narrow for readability.
+        view === "list" ? "max-w-3xl" : "max-w-screen-2xl"
       )}
     >
       {actionError && (
@@ -217,10 +225,10 @@ export default function DashboardPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          {/* List / Board view switcher */}
+          {/* List / Board / Table view switcher */}
           <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
-            {(["list", "board"] as const).map((v) => {
-              const Icon = v === "list" ? List : LayoutGrid;
+            {(["list", "board", "table"] as const).map((v) => {
+              const Icon = v === "list" ? List : v === "board" ? LayoutGrid : Rows3;
               return (
                 <button
                   key={v}
@@ -299,7 +307,33 @@ export default function DashboardPage() {
         <span className="ml-2 text-muted-foreground/70">{total}</span>
       </h2>
 
-      {loading ? (
+      {error ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-danger">Couldn’t load tasks. {error}</p>
+          <Button variant="secondary" size="sm" onClick={() => reload()}>
+            Retry
+          </Button>
+        </Card>
+      ) : !loading && items.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            {status !== "all" || q ? "No tasks match your filters." : "No tasks yet."}
+          </p>
+          <Button variant="secondary" size="sm" onClick={handleCreateTask}>
+            <Plus className="h-4 w-4" />
+            Create your first task
+          </Button>
+        </Card>
+      ) : view === "table" ? (
+        <TableView
+          items={items}
+          sort={sort}
+          onSort={setSort}
+          onEditTask={handleEditTask}
+          onDeleteTask={(t) => setDeleteTarget(t)}
+          loading={loading}
+        />
+      ) : loading ? (
         <ul className="flex flex-col gap-2.5">
           {Array.from({ length: 5 }).map((_, i) => (
             <li
@@ -312,25 +346,7 @@ export default function DashboardPage() {
             </li>
           ))}
         </ul>
-      ) : error ? (
-        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-sm text-danger">Couldn’t load tasks. {error}</p>
-          <Button variant="secondary" size="sm" onClick={() => reload()}>
-            Retry
-          </Button>
-        </Card>
-      ) : items.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-sm text-muted-foreground">
-            {status !== "all" || q ? "No tasks match your filters." : "No tasks yet."}
-          </p>
-          <Button variant="secondary" size="sm" onClick={handleCreateTask}>
-            <Plus className="h-4 w-4" />
-            Create your first task
-          </Button>
-        </Card>
       ) : (
-        <>
           <ul className="flex flex-col gap-2.5">
             {items.map((task) => {
               const priority = PRIORITY_COLOR[task.priority as TaskPriority]
@@ -399,10 +415,11 @@ export default function DashboardPage() {
               );
             })}
           </ul>
+      )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
+      {/* Pagination — shared by list & table */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
@@ -445,8 +462,6 @@ export default function DashboardPage() {
               </button>
             </div>
           )}
-        </>
-      )}
       </>
       )}
 

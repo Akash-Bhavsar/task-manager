@@ -18,6 +18,7 @@ export interface UseTasks {
   setQ: (q: string) => void;
   setSort: (s: string) => void;
   setPage: (p: number) => void;
+  setPageSize: (n: number) => void;
   reload: () => Promise<void>;
 }
 
@@ -25,7 +26,7 @@ export interface UseTasks {
 // Owns filter/search/sort/pagination state and refetches when any changes;
 // search is debounced and filter changes reset to page 1.
 export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
-  const pageSize = initial?.pageSize ?? 5;
+  const [pageSize, setPageSize] = useState(initial?.pageSize ?? 5);
   const [status, setStatus] = useState(initial?.status ?? "all");
   const [q, setQ] = useState(initial?.q ?? "");
   const [sort, setSort] = useState(initial?.sort ?? "updated");
@@ -47,7 +48,7 @@ export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
   // Any filter/search/sort change resets to the first page.
   useEffect(() => {
     setPage(1);
-  }, [status, sort, debouncedQ]);
+  }, [status, sort, debouncedQ, pageSize]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +84,7 @@ export function useTasks(initial?: Partial<TasksQuery>): UseTasks {
     setQ,
     setSort,
     setPage,
+    setPageSize,
     reload: load,
   };
 }
