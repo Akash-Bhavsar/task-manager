@@ -72,6 +72,9 @@ export default function DashboardPage() {
 
   // List vs Board view, persisted across sessions.
   const [view, setView] = useState<"list" | "board">("list");
+  // Bumped after a global-Create/edit/delete so the board refetches too (it owns
+  // its own data source, separate from the list's useTasks hook).
+  const [boardReloadKey, setBoardReloadKey] = useState(0);
   useEffect(() => {
     const saved = localStorage.getItem("task-view");
     if (saved === "board" || saved === "list") setView(saved);
@@ -148,6 +151,7 @@ export default function DashboardPage() {
       }
       setModalOpen(false);
       await reload();
+      setBoardReloadKey((k) => k + 1);
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Failed to save task."
@@ -160,6 +164,7 @@ export default function DashboardPage() {
       await deleteTask(String(taskId));
       setModalOpen(false);
       await reload();
+      setBoardReloadKey((k) => k + 1);
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Failed to delete task."
@@ -174,6 +179,7 @@ export default function DashboardPage() {
     try {
       await deleteTask(String(target.id));
       await reload();
+      setBoardReloadKey((k) => k + 1);
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Failed to delete task."
@@ -228,17 +234,15 @@ export default function DashboardPage() {
               );
             })}
           </div>
-          {view === "list" && (
-            <Button onClick={handleCreateTask}>
-              <Plus className="h-4 w-4" />
-              Create Task
-            </Button>
-          )}
+          <Button onClick={handleCreateTask}>
+            <Plus className="h-4 w-4" />
+            Create Task
+          </Button>
         </div>
       </div>
 
       {view === "board" ? (
-        <BoardView />
+        <BoardView reloadSignal={boardReloadKey} />
       ) : (
       <>
       {/* Filter / sort / search */}
@@ -302,6 +306,13 @@ export default function DashboardPage() {
             </li>
           ))}
         </ul>
+      ) : error ? (
+        <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <p className="text-sm text-danger">Couldn’t load tasks. {error}</p>
+          <Button variant="secondary" size="sm" onClick={() => reload()}>
+            Retry
+          </Button>
+        </Card>
       ) : items.length === 0 ? (
         <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
           <p className="text-sm text-muted-foreground">

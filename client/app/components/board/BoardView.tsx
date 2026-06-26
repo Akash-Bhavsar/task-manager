@@ -55,7 +55,7 @@ function resolveContainer(
   return locate(cols, id);
 }
 
-export default function BoardView() {
+export default function BoardView({ reloadSignal }: { reloadSignal?: number }) {
   const [columns, setColumns] = useState<Columns>(emptyColumns);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -95,7 +95,7 @@ export default function BoardView() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, reloadSignal]);
 
   const activeTask = activeId
     ? Object.values(columns)
