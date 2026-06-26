@@ -38,7 +38,9 @@ model Task {
   priority    String    @default("medium")
   dueDate     DateTime?
   // Ordering within a status column (Kanban). Lower = higher in the list.
-  position    Int       @default(0)
+  // Float so a moved card can take the midpoint between its two neighbors —
+  // a single-row write, no whole-column reindex.
+  position    Float     @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   user        User      @relation(fields: [userId], references: [id])
