@@ -2,6 +2,22 @@
 
 Full-stack task manager: JWT auth + task CRUD with role-based access (ADMIN/USER).
 
+🔗 **Live demo:** https://task-manager-phi-eight-69.vercel.app
+
+## Deploy your own
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Akash-Bhavsar/task-manager&root-directory=client&env=NEXT_PUBLIC_API_URL&envDescription=Base%20URL%20of%20the%20API%20server&project-name=task-manager&repository-name=task-manager)
+[![Create a Neon Postgres DB](https://img.shields.io/badge/Neon-Create%20Postgres-00E599?logo=postgresql&logoColor=white)](https://console.neon.tech/signup)
+
+1. **Neon** → create a free serverless Postgres and copy its `DATABASE_URL`.
+2. **Vercel** → deploys the Next.js client (`client/`); set `NEXT_PUBLIC_API_URL`
+   to your API URL.
+3. **API** → deploy `server/` (Docker runtime, `server/Dockerfile`) on Render and
+   set `DATABASE_URL`, `JWT_SECRET`, `CLIENT_ORIGIN`.
+
+See the [`## Deploy`](#deploy) section and `terraform/README.md` for the full,
+Terraform-driven setup.
+
 ## Stack
 
 - **Client** (`client/`) — Next.js 16, React 19, TypeScript, Tailwind. Auth via httpOnly cookie.
@@ -62,12 +78,12 @@ Git-native CD — push to `main` → Vercel (client) + Render (API) rebuild; Neo
 | | |
 |---|---|
 | Homepage | ![Homepage](/public/Homepage.webp) |
-| Dashboard | ![Dashboard](/public/Dashboard.webp) |
+| Kanban board | ![Kanban board](/public/Dashboard.webp) |
+| List view & filters | ![List view and filters](/public/Filters.webp) |
 | Login | ![Login](/public/LoginPage.webp) |
 | Signup | ![Signup](/public/SignupPage.webp) |
 | Create task | ![Create Task](/public/CreateTask.webp) |
 | Edit task | ![Edit Task](/public/EditTask.webp) |
-| Filters | ![Filters](/public/Filters.webp) |
 
 ## License
 

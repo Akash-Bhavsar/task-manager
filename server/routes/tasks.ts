@@ -112,6 +112,36 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
   }
 });
 
+// GET /tasks/:id - Fetch a single task. ADMIN can read any task; a USER can
+// only read their own. Returns JSON 404 when missing/unauthorized so callers
+// get a clean error instead of Express's default "Cannot GET" HTML.
+router.get('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'Invalid task id' });
+    return;
+  }
+
+  try {
+    const user = req.user!;
+    const isAdmin = user.role === 'ADMIN';
+
+    const task = await prisma.task.findFirst({
+      where: { id, ...(isAdmin ? {} : { userId: user.id }) },
+    });
+
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    res.json(task);
+  } catch (err) {
+    logger.error(`Failed to get task id=${id}: ${(err as Error).message}`, { error: err });
+    res.status(500).json({ error: 'Failed to get task' });
+  }
+});
+
 // POST /tasks - Create a new task
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   const { title, description, status, priority, dueDate } = req.body as {
@@ -255,9 +285,17 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response): Pr
       return
     }
 
-    await prisma.task.delete({
+    // deleteMany never throws when the row is missing (unlike delete), so a
+    // double-delete returns a clean 404 instead of a Prisma P2025 → 500.
+    const result = await prisma.task.deleteMany({
       where: { id: parseInt(id) },
     });
+
+    if (result.count === 0) {
+      logger.warn(`User userId=${user.id} attempted to delete non-existent task id=${id}`);
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
 
     logger.info(`Task (id=${id}) deleted successfully by userId=${user.id}`);
     res.json({ message: 'Task deleted successfully' });
