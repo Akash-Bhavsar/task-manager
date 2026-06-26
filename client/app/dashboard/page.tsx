@@ -12,8 +12,11 @@ import {
   ChevronRight,
   ListTodo,
   CalendarClock,
+  List,
+  LayoutGrid,
 } from "lucide-react";
 import Task, { TaskData } from "@/app/components/Task";
+import BoardView from "@/app/components/board/BoardView";
 import { useTasks } from "@/app/hooks/useTasks";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
@@ -66,6 +69,16 @@ export default function DashboardPage() {
   const [deleteTarget, setDeleteTarget] = useState<TaskData | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // List vs Board view, persisted across sessions.
+  const [view, setView] = useState<"list" | "board">("list");
+  useEffect(() => {
+    const saved = localStorage.getItem("task-view");
+    if (saved === "board" || saved === "list") setView(saved);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("task-view", view);
+  }, [view]);
 
   // Auth errors from the fetch → bounce to login.
   useEffect(() => {
@@ -191,12 +204,43 @@ export default function DashboardPage() {
             Dashboard
           </h1>
         </div>
-        <Button onClick={handleCreateTask}>
-          <Plus className="h-4 w-4" />
-          Create Task
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* List / Board view switcher */}
+          <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
+            {(["list", "board"] as const).map((v) => {
+              const Icon = v === "list" ? List : LayoutGrid;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  aria-label={`${v} view`}
+                  aria-pressed={view === v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors cursor-pointer",
+                    view === v
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-muted"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              );
+            })}
+          </div>
+          {view === "list" && (
+            <Button onClick={handleCreateTask}>
+              <Plus className="h-4 w-4" />
+              Create Task
+            </Button>
+          )}
+        </div>
       </div>
 
+      {view === "board" ? (
+        <BoardView />
+      ) : (
+      <>
       {/* Filter / sort / search */}
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="sm:w-40">
@@ -376,6 +420,8 @@ export default function DashboardPage() {
             </div>
           )}
         </>
+      )}
+      </>
       )}
 
       {/* Task modal */}

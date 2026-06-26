@@ -37,6 +37,8 @@ interface TaskProps {
   onClose: () => void;
   // If editing, we pass an existing task
   initialTask?: TaskData;
+  // Pre-selected status when creating (e.g. the Kanban column the "+" came from).
+  defaultStatus?: string;
   // Called on create or edit submission
   onSubmit: (task: TaskData) => Promise<void>;
   // Called if user wants to delete the task
@@ -47,14 +49,22 @@ const Task: React.FC<TaskProps> = ({
   isOpen,
   onClose,
   initialTask,
+  defaultStatus,
   onSubmit,
   onDelete,
 }) => {
+  // Create defaults to `defaultStatus` (the column its "+" came from), else draft.
+  const initialStatus = initialTask
+    ? normalizeStatus(initialTask.status)
+    : defaultStatus
+      ? normalizeStatus(defaultStatus)
+      : DEFAULT_STATUS;
+
   const [task, setTask] = useState<TaskData>({
     id: initialTask?.id,
     title: initialTask?.title || "",
     description: initialTask?.description || "",
-    status: initialTask ? normalizeStatus(initialTask.status) : DEFAULT_STATUS,
+    status: initialStatus,
     priority: initialTask?.priority || DEFAULT_PRIORITY,
     dueDate: toDateInput(initialTask?.dueDate),
   });
@@ -68,11 +78,12 @@ const Task: React.FC<TaskProps> = ({
       id: initialTask?.id,
       title: initialTask?.title || "",
       description: initialTask?.description || "",
-      status: initialTask ? normalizeStatus(initialTask.status) : DEFAULT_STATUS,
+      status: initialStatus,
       priority: initialTask?.priority || DEFAULT_PRIORITY,
       dueDate: toDateInput(initialTask?.dueDate),
     });
-  }, [initialTask, isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTask, isOpen, defaultStatus]);
 
   // Toast / Error management
   const [toast, setToast] = useState<{
