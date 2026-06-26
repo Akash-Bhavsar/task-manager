@@ -112,6 +112,12 @@ export async function deleteTask(taskId: string) {
     credentials: "include",
   });
 
+  // 404 means the task is already gone — treat delete as idempotent so a stale
+  // view or double-click doesn't surface a spurious error.
+  if (response.status === 404) {
+    return { message: "Task already deleted" };
+  }
+
   if (!response.ok) {
     throw new Error(`Failed to delete task ${taskId}: ${response.status}`);
   }
