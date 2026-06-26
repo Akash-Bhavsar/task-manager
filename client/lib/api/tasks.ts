@@ -112,6 +112,39 @@ export async function updateTask(taskId: string, updatedData: Partial<TaskData>)
   return response.json();
 }
 
+// Set the same status on many tasks at once. Returns the number updated.
+export async function bulkUpdateStatus(
+  ids: number[],
+  status: string
+): Promise<{ count: number }> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/bulk`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, status }),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => null);
+    throw new Error(msg?.error ?? `Failed to update tasks: ${res.status}`);
+  }
+  return res.json();
+}
+
+// Delete many tasks at once (ADMIN-only on the server). Returns the count deleted.
+export async function bulkDeleteTasks(ids: number[]): Promise<{ count: number }> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/bulk-delete`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => null);
+    throw new Error(msg?.error ?? `Failed to delete tasks: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function deleteTask(taskId: string) {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
     method: "DELETE",

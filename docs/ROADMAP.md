@@ -70,7 +70,7 @@ These block a correct Kanban/board and are addressed in Phase 0:
   Cross-cutting (needs DB enums).
 - View switcher (List / Board / Table), persisted in `localStorage`.
 
-### Phase 5 — Calendar, labels, bulk `[in progress]`
+### Phase 5 — Calendar, labels, bulk `[done]`
 - **Calendar view** keyed off `dueDate` `[done]` — month grid, prev/next/today,
   tasks as day chips (priority dot, overdue/done styling), click chip to edit,
   click a day to create with that date pre-filled (`Task` `defaultDueDate`).
@@ -79,7 +79,10 @@ These block a correct Kanban/board and are addressed in Phase 0:
   accept `labelIds` on create/update; client label picker in the task modal
   (toggle + inline create), colored chips on list/board/table cards, and a
   label filter on list/table (`?label=`).
-- **Bulk actions**: multi-select → delete / move / set status.
+- **Bulk actions** `[done]` — multi-select rows in the Table view; a toolbar to
+  set status (move between statuses) or delete the selection. Server batch
+  endpoints `POST /api/tasks/bulk` (status, owner-scoped) and
+  `POST /api/tasks/bulk-delete` (ADMIN-only, mirroring single delete).
 
 ---
 

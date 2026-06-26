@@ -327,6 +327,68 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response): Promi
   }
 });
 
+// Parse a bulk `ids` payload to a unique, valid number[].
+function parseIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const ids = value.map((v) => parseInt(String(v), 10)).filter((n) => !isNaN(n));
+  return [...new Set(ids)];
+}
+
+// POST /tasks/bulk - set the status on many of the user's own tasks at once.
+// Body: { ids: number[], status: string }. Returns { count }.
+router.post('/bulk', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  const { ids: rawIds, status } = req.body as { ids?: number[]; status?: string };
+  const ids = parseIds(rawIds);
+
+  if (ids.length === 0) {
+    res.status(400).json({ error: 'No task ids provided' });
+    return;
+  }
+  const normStatus = normalizeStatus(status);
+  if (normStatus === null) {
+    res.status(400).json({ error: 'Invalid status' });
+    return;
+  }
+
+  try {
+    const user = req.user!;
+    const isAdmin = user.role === 'ADMIN';
+    const result = await prisma.task.updateMany({
+      where: { id: { in: ids }, ...(isAdmin ? {} : { userId: user.id }) },
+      data: { status: normStatus },
+    });
+    logger.info(`POST /tasks/bulk by userId=${user.id} status=${normStatus} -> ${result.count}`);
+    res.json({ count: result.count });
+  } catch (err) {
+    logger.error(`Failed bulk status update: ${(err as Error).message}`, { error: err });
+    res.status(500).json({ error: 'Failed to update tasks' });
+  }
+});
+
+// POST /tasks/bulk-delete - delete many tasks at once (ADMIN-only, mirroring the
+// single-delete policy). Body: { ids: number[] }. Returns { count }.
+router.post('/bulk-delete', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  const ids = parseIds((req.body as { ids?: number[] }).ids);
+  if (ids.length === 0) {
+    res.status(400).json({ error: 'No task ids provided' });
+    return;
+  }
+
+  try {
+    const user = req.user!;
+    if (user.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Unauthorized: Only ADMIN users can delete tasks.' });
+      return;
+    }
+    const result = await prisma.task.deleteMany({ where: { id: { in: ids } } });
+    logger.info(`POST /tasks/bulk-delete by userId=${user.id} -> ${result.count}`);
+    res.json({ count: result.count });
+  } catch (err) {
+    logger.error(`Failed bulk delete: ${(err as Error).message}`, { error: err });
+    res.status(500).json({ error: 'Failed to delete tasks' });
+  }
+});
+
 // DELETE /tasks/:id - Delete a task
 router.delete('/:id', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   const id = String(req.params.id);

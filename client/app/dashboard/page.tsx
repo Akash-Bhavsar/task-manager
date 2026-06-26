@@ -385,6 +385,10 @@ export default function DashboardPage() {
           onEditTask={handleEditTask}
           onDeleteTask={(t) => setDeleteTarget(t)}
           loading={loading}
+          onBulkComplete={async () => {
+            await reload();
+            setBoardReloadKey((k) => k + 1);
+          }}
         />
       ) : loading ? (
         <ul className="flex flex-col gap-2.5">
