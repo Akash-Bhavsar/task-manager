@@ -340,8 +340,9 @@ export default function DashboardPage() {
               return (
                 <li key={task.id}>
                   <Card
-                    className="border-l-[3px] p-4 transition-colors hover:border-border-strong"
+                    className="cursor-pointer border-l-[3px] p-4 transition-colors hover:border-border-strong"
                     style={{ borderLeftColor: PRIORITY_COLOR[priority] }}
+                    onClick={() => handleEditTask(task)}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="font-medium text-foreground">
@@ -373,13 +374,21 @@ export default function DashboardPage() {
                     )}
 
                     <div className="mt-4 flex gap-2">
-                      <IconButton onClick={() => handleEditTask(task)}>
+                      <IconButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditTask(task);
+                        }}
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                         Edit
                       </IconButton>
                       <IconButton
                         variant="danger"
-                        onClick={() => setDeleteTarget(task)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(task);
+                        }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete

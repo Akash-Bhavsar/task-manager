@@ -154,7 +154,7 @@ const Task: React.FC<TaskProps> = ({
       )}
 
       {/* Modal container */}
-      <div className="relative w-full max-w-xl rounded-xl border border-border bg-surface p-8 shadow-xl animate-scale-in">
+      <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-border bg-surface p-8 shadow-xl animate-scale-in">
         {/* Close button */}
         <button
           type="button"

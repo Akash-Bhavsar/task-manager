@@ -134,7 +134,8 @@ export default function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="group relative touch-none"
+      className="group relative cursor-pointer touch-none"
+      onClick={() => onEdit(task)}
       {...attributes}
       {...listeners}
     >
