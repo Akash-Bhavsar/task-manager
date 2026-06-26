@@ -70,8 +70,8 @@ export default function DashboardPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // List vs Board view, persisted across sessions.
-  const [view, setView] = useState<"list" | "board">("list");
+  // List vs Board view, persisted across sessions. Defaults to the Kanban board.
+  const [view, setView] = useState<"list" | "board">("board");
   // Bumped after a global-Create/edit/delete so the board refetches too (it owns
   // its own data source, separate from the list's useTasks hook).
   const [boardReloadKey, setBoardReloadKey] = useState(0);
@@ -191,7 +191,13 @@ export default function DashboardPage() {
     "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-3 text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none";
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+    <div
+      className={cn(
+        "mx-auto w-full px-4 py-10 sm:px-6",
+        // Board uses the full screen; the list stays narrow for readability.
+        view === "board" ? "max-w-screen-2xl" : "max-w-3xl"
+      )}
+    >
       {actionError && (
         <ErrorPopup
           message={actionError}
