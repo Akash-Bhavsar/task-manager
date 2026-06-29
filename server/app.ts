@@ -7,6 +7,7 @@ import taskRoutes from './routes/tasks';
 import labelRoutes from './routes/labels';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { csrfProtection } from './middlewares/csrfProtection';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use(cors({
   },
   credentials: true
 }));
+app.use(csrfProtection(allowedOrigins, originRegex));
 const port = process.env.PORT || 3000;
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
